@@ -1,0 +1,9 @@
+node_modules/
+.env
+src/db/*.sqlite
+src/db/*.sqlite-shm
+src/db/*.sqlite-wal
+uploads/*
+!uploads/.gitkeep
+exports/*
+!exports/.gitkeep
