@@ -1,0 +1,47 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h1 class="h3 mb-1">Chapters</h1>
+    <p class="text-secondary mb-0"><%= project.title %></p>
+  </div>
+  <a class="btn btn-outline-secondary" href="/projects/<%= project.id %>">Project overview</a>
+</div>
+
+<div class="table-responsive bg-white border rounded">
+  <table class="table table-hover align-middle mb-0">
+    <thead class="table-light">
+      <tr>
+        <th>#</th>
+        <th>Title</th>
+        <th>Status</th>
+        <th>Words</th>
+        <th class="text-end">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!chapters.length) { %>
+        <tr><td colspan="5" class="text-center text-secondary py-5">Generate a book plan or chapters to create chapter records.</td></tr>
+      <% } %>
+      <% chapters.forEach((chapter) => { %>
+        <tr>
+          <td><%= chapter.chapter_number %></td>
+          <td>
+            <div class="fw-semibold"><%= chapter.title %></div>
+            <div class="small text-secondary text-truncate" style="max-width: 560px"><%= chapter.outline || 'No outline' %></div>
+          </td>
+          <td><span class="badge <%= chapter.status === 'approved' ? 'text-bg-success' : chapter.status === 'generated' ? 'text-bg-primary' : 'text-bg-secondary' %>"><%= chapter.status %></span></td>
+          <td><%= chapter.content ? chapter.content.trim().split(/\s+/).length.toLocaleString() : 0 %></td>
+          <td class="text-end">
+            <div class="d-inline-flex gap-2">
+              <a class="btn btn-sm btn-outline-secondary" href="/projects/<%= project.id %>/chapters/<%= chapter.id %>/edit">Edit</a>
+              <% if (chapter.content && chapter.status !== 'approved') { %>
+                <form method="post" action="/projects/<%= project.id %>/chapters/<%= chapter.id %>/approve">
+                  <button class="btn btn-sm btn-outline-success" type="submit">Approve</button>
+                </form>
+              <% } %>
+            </div>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>

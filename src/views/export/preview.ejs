@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= project.title %> Preview</title>
+  <link href="/public/vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background: #e9ecef; }
+    .preview-toolbar { position: sticky; top: 0; z-index: 10; }
+    iframe { width: 100%; min-height: calc(100vh - 78px); border: 0; background: white; }
+  </style>
+</head>
+<body>
+  <div class="preview-toolbar bg-white border-bottom p-3 d-flex justify-content-between align-items-center">
+    <div>
+      <strong><%= project.title %></strong>
+      <span class="text-secondary ms-2"><%= chapters.length %> chapters</span>
+    </div>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-secondary" href="/projects/<%= project.id %>">Back</a>
+      <form method="post" action="/projects/<%= project.id %>/export/pdf">
+        <button class="btn btn-success" type="submit" <%= chapters.length ? '' : 'disabled' %>>Export PDF</button>
+      </form>
+    </div>
+  </div>
+  <iframe title="Book preview" srcdoc="<%- previewHtml.replace(/&/g, '&amp;').replace(/"/g, '&quot;') %>"></iframe>
+</body>
+</html>

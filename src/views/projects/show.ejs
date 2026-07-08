@@ -1,0 +1,145 @@
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+  <div>
+    <div class="d-flex align-items-center gap-2">
+      <h1 class="h3 mb-1"><%= project.title %></h1>
+      <span class="badge text-bg-secondary"><%= project.genre || 'Book' %></span>
+    </div>
+    <p class="text-secondary mb-0"><%= project.subtitle || project.description || 'No description provided.' %></p>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="/projects/<%= project.id %>/edit">Edit</a>
+    <form method="post" action="/projects/<%= project.id %>?_method=DELETE" onsubmit="return confirm('Delete this project and all generated content?')">
+      <button class="btn btn-outline-danger" type="submit">Delete</button>
+    </form>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-xl-8">
+    <section class="bg-white border rounded p-4 mb-4">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+          <h2 class="h5 mb-1">Source materials</h2>
+          <p class="small text-secondary mb-0">Plain text and Markdown, up to <%= process.env.MAX_UPLOAD_MB || 10 %> MB each.</p>
+        </div>
+        <span class="badge text-bg-light border"><%= files.length %> files</span>
+      </div>
+      <form method="post" enctype="multipart/form-data" action="/projects/<%= project.id %>/files" class="row g-2 mb-3">
+        <div class="col"><input class="form-control" type="file" name="source_files" accept=".txt,.md" multiple required></div>
+        <div class="col-auto"><button class="btn btn-primary" type="submit">Upload</button></div>
+      </form>
+      <% if (files.length) { %>
+        <div class="list-group list-group-flush border-top">
+          <% files.forEach((file) => { %>
+            <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
+              <div>
+                <div class="fw-medium"><%= file.original_filename %></div>
+                <div class="small text-secondary"><%= file.extracted_text.length.toLocaleString() %> characters · <%= file.summary ? 'Summarized' : 'Pending summary' %></div>
+              </div>
+              <form method="post" action="/projects/<%= project.id %>/files/<%= file.id %>?_method=DELETE">
+                <button class="btn btn-sm btn-outline-danger" type="submit">Remove</button>
+              </form>
+            </div>
+          <% }) %>
+        </div>
+      <% } %>
+    </section>
+
+    <section class="bg-white border rounded p-4 mb-4">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <div>
+          <h2 class="h5 mb-1">Book plan</h2>
+          <p class="small text-secondary mb-0">Concept, outline, book bible, style, and continuity.</p>
+        </div>
+        <form method="post" action="/projects/<%= project.id %>/generation/plan" data-loading-form>
+          <button class="btn btn-primary" type="submit"><%= plan ? 'Regenerate Book Plan' : 'Generate Book Plan' %></button>
+        </form>
+      </div>
+      <% if (plan) { %>
+        <div class="accordion" id="planAccordion">
+          <% [
+            ['Concept', plan.concept],
+            ['Detailed outline', plan.detailed_outline],
+            ['Chapter list', plan.chapter_list],
+            ['Book bible', plan.book_bible],
+            ['Style guide', plan.style_guide],
+            ['Characters and locations', plan.character_location_notes],
+            ['Continuity notes', plan.continuity_notes]
+          ].forEach(([label, value], index) => { %>
+            <div class="accordion-item">
+              <h3 class="accordion-header">
+                <button class="accordion-button <%= index ? 'collapsed' : '' %>" type="button" data-bs-toggle="collapse" data-bs-target="#plan<%= index %>"><%= label %></button>
+              </h3>
+              <div id="plan<%= index %>" class="accordion-collapse collapse <%= index === 0 ? 'show' : '' %>" data-bs-parent="#planAccordion">
+                <div class="accordion-body text-break" style="white-space: pre-wrap"><%= value || 'Not generated.' %></div>
+              </div>
+            </div>
+          <% }) %>
+        </div>
+      <% } else { %>
+        <div class="text-secondary border rounded p-4 text-center">Generate a plan after adding project guidance and optional source material.</div>
+      <% } %>
+    </section>
+
+    <section class="bg-white border rounded p-4">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <div>
+          <h2 class="h5 mb-1">Chapters</h2>
+          <p class="small text-secondary mb-0">Generated sequentially with summaries and continuity updates.</p>
+        </div>
+        <div class="d-flex gap-2">
+          <a class="btn btn-outline-secondary" href="/projects/<%= project.id %>/chapters">Review</a>
+          <form method="post" action="/projects/<%= project.id %>/generation/chapters" data-loading-form>
+            <button class="btn btn-primary" type="submit">Generate Chapters</button>
+          </form>
+        </div>
+      </div>
+      <div class="progress mb-3" role="progressbar" aria-label="Chapter generation">
+        <% const generated = chapters.filter((c) => c.content).length; const percentage = Math.round((generated / project.target_chapter_count) * 100); %>
+        <div class="progress-bar" style="width: <%= percentage %>%"><%= generated %>/<%= project.target_chapter_count %></div>
+      </div>
+      <div class="d-flex gap-2">
+        <a class="btn btn-outline-primary <%= generated ? '' : 'disabled' %>" href="/projects/<%= project.id %>/export/preview" target="_blank">HTML Preview</a>
+        <form method="post" action="/projects/<%= project.id %>/export/pdf" data-loading-form>
+          <button class="btn btn-success" type="submit" <%= generated ? '' : 'disabled' %>>Export PDF</button>
+        </form>
+      </div>
+    </section>
+  </div>
+
+  <div class="col-xl-4">
+    <section class="bg-white border rounded p-4 mb-4">
+      <% if (project.cover_image_path) { %>
+        <img class="cover-thumb d-block mb-3" src="/<%= project.cover_image_path.replace(/\\/g, '/') %>" alt="Book cover">
+      <% } %>
+      <h2 class="h6">Project target</h2>
+      <dl class="row small mb-0">
+        <dt class="col-5 text-secondary">Author</dt><dd class="col-7"><%= project.author || '—' %></dd>
+        <dt class="col-5 text-secondary">Language</dt><dd class="col-7"><%= project.target_language %></dd>
+        <dt class="col-5 text-secondary">Words</dt><dd class="col-7"><%= Number(project.target_word_count).toLocaleString() %></dd>
+        <dt class="col-5 text-secondary">Chapters</dt><dd class="col-7"><%= project.target_chapter_count %></dd>
+        <dt class="col-5 text-secondary">Tone</dt><dd class="col-7"><%= project.tone || '—' %></dd>
+        <dt class="col-5 text-secondary">Audience</dt><dd class="col-7"><%= project.audience || '—' %></dd>
+      </dl>
+    </section>
+
+    <section class="bg-white border rounded p-4">
+      <h2 class="h6 mb-3">Generation log</h2>
+      <% if (!logs.length) { %>
+        <p class="small text-secondary mb-0">No generation activity yet.</p>
+      <% } else { %>
+        <div class="vstack gap-3">
+          <% logs.slice(0, 12).forEach((log) => { %>
+            <div>
+              <div class="d-flex justify-content-between gap-2">
+                <span class="small fw-medium"><%= log.step.replaceAll('_', ' ') %></span>
+                <span class="badge status-pill <%= log.status === 'success' ? 'text-bg-success' : log.status === 'failed' ? 'text-bg-danger' : 'text-bg-warning' %>"><%= log.status %></span>
+              </div>
+              <div class="small text-secondary"><%= log.message %></div>
+            </div>
+          <% }) %>
+        </div>
+      <% } %>
+    </section>
+  </div>
+</div>

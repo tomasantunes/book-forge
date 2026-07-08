@@ -1,0 +1,46 @@
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+  <div>
+    <div class="small text-secondary">Chapter <%= chapter.chapter_number %></div>
+    <h1 class="h3 mb-0"><%= chapter.title %></h1>
+  </div>
+  <div class="d-flex gap-2">
+    <form method="post" action="/projects/<%= project.id %>/chapters/<%= chapter.id %>/regenerate" data-loading-form onsubmit="return confirm('Replace the current chapter content?')">
+      <button class="btn btn-outline-primary" type="submit">Regenerate</button>
+    </form>
+    <a class="btn btn-outline-secondary" href="/projects/<%= project.id %>/chapters">Back</a>
+  </div>
+</div>
+
+<form method="post" action="/projects/<%= project.id %>/chapters/<%= chapter.id %>?_method=PUT">
+  <div class="row g-4">
+    <div class="col-xl-9">
+      <div class="bg-white border rounded p-4">
+        <div class="mb-3">
+          <label class="form-label" for="title">Chapter title</label>
+          <input class="form-control" id="title" name="title" value="<%= chapter.title %>" required>
+        </div>
+        <div>
+          <label class="form-label" for="content">Content</label>
+          <textarea class="form-control chapter-editor" id="content" name="content"><%= chapter.content || '' %></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="col-xl-3">
+      <div class="bg-white border rounded p-4 mb-4">
+        <label class="form-label" for="status">Status</label>
+        <select class="form-select mb-3" id="status" name="status">
+          <% ['planned', 'draft', 'generated', 'approved'].forEach((status) => { %>
+            <option value="<%= status %>" <%= chapter.status === status ? 'selected' : '' %>><%= status %></option>
+          <% }) %>
+        </select>
+        <button class="btn btn-primary w-100" type="submit">Save chapter</button>
+      </div>
+      <div class="bg-white border rounded p-4">
+        <h2 class="h6">Outline</h2>
+        <p class="small text-secondary" style="white-space: pre-wrap"><%= chapter.outline || 'No outline.' %></p>
+        <h2 class="h6 mt-4">Summary</h2>
+        <p class="small text-secondary mb-0" style="white-space: pre-wrap"><%= chapter.summary || 'No summary yet.' %></p>
+      </div>
+    </div>
+  </div>
+</form>

@@ -1,0 +1,45 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h1 class="h3 mb-1">Book projects</h1>
+    <p class="text-secondary mb-0">Create, generate, review, and export long-form books.</p>
+  </div>
+  <a class="btn btn-primary" href="/projects/new">New project</a>
+</div>
+
+<% if (!projects.length) { %>
+  <div class="bg-white border rounded p-5 text-center">
+    <h2 class="h5">No book projects yet</h2>
+    <p class="text-secondary">Create a project to start organizing source material and planning chapters.</p>
+    <a class="btn btn-primary" href="/projects/new">Create project</a>
+  </div>
+<% } else { %>
+  <div class="table-responsive bg-white border rounded">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Title</th>
+          <th>Author</th>
+          <th>Genre</th>
+          <th>Target</th>
+          <th>Updated</th>
+          <th class="text-end"></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% projects.forEach((item) => { %>
+          <tr>
+            <td>
+              <a class="fw-semibold text-decoration-none" href="/projects/<%= item.id %>"><%= item.title %></a>
+              <% if (item.subtitle) { %><div class="small text-secondary"><%= item.subtitle %></div><% } %>
+            </td>
+            <td><%= item.author || '—' %></td>
+            <td><%= item.genre || '—' %></td>
+            <td><%= item.target_chapter_count %> chapters / <%= Number(item.target_word_count).toLocaleString() %> words</td>
+            <td><%= new Date(item.updated_at).toLocaleDateString() %></td>
+            <td class="text-end"><a class="btn btn-sm btn-outline-secondary" href="/projects/<%= item.id %>">Open</a></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+<% } %>

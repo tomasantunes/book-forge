@@ -1,0 +1,64 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h1 class="h3 mb-1"><%= project ? 'Edit project' : 'New project' %></h1>
+    <p class="text-secondary mb-0">Define the editorial target and generation guidance.</p>
+  </div>
+  <a class="btn btn-outline-secondary" href="<%= project ? `/projects/${project.id}` : '/projects' %>">Cancel</a>
+</div>
+
+<form class="bg-white border rounded p-4" method="post" enctype="multipart/form-data" action="<%= project ? `/projects/${project.id}?_method=PUT` : '/projects' %>">
+  <div class="row g-3">
+    <div class="col-md-8">
+      <label class="form-label" for="title">Title</label>
+      <input class="form-control" id="title" name="title" required value="<%= project?.title || '' %>">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label" for="author">Author</label>
+      <input class="form-control" id="author" name="author" value="<%= project?.author || '' %>">
+    </div>
+    <div class="col-12">
+      <label class="form-label" for="subtitle">Subtitle</label>
+      <input class="form-control" id="subtitle" name="subtitle" value="<%= project?.subtitle || '' %>">
+    </div>
+    <div class="col-12">
+      <label class="form-label" for="description">Description</label>
+      <textarea class="form-control" id="description" name="description" rows="3"><%= project?.description || '' %></textarea>
+    </div>
+    <div class="col-12">
+      <label class="form-label" for="guidance_prompt">Guidance prompt</label>
+      <textarea class="form-control" id="guidance_prompt" name="guidance_prompt" rows="6" placeholder="Explain the book's purpose, themes, required structure, constraints, and source handling."><%= project?.guidance_prompt || '' %></textarea>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label" for="target_language">Language</label>
+      <input class="form-control" id="target_language" name="target_language" value="<%= project?.target_language || 'English' %>">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label" for="target_word_count">Target word count</label>
+      <input class="form-control" type="number" min="1000" id="target_word_count" name="target_word_count" value="<%= project?.target_word_count || 50000 %>">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label" for="target_chapter_count">Target chapters</label>
+      <input class="form-control" type="number" min="1" max="100" id="target_chapter_count" name="target_chapter_count" value="<%= project?.target_chapter_count || 10 %>">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label" for="genre">Genre</label>
+      <input class="form-control" id="genre" name="genre" value="<%= project?.genre || '' %>">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label" for="tone">Tone</label>
+      <input class="form-control" id="tone" name="tone" value="<%= project?.tone || '' %>">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label" for="audience">Audience</label>
+      <input class="form-control" id="audience" name="audience" value="<%= project?.audience || '' %>">
+    </div>
+    <div class="col-12">
+      <label class="form-label" for="cover_image">Book cover</label>
+      <input class="form-control" type="file" accept=".jpg,.jpeg,.png,.webp" id="cover_image" name="cover_image">
+      <% if (project?.cover_image_path) { %><div class="form-text">Uploading a new image replaces the current cover.</div><% } %>
+    </div>
+  </div>
+  <div class="mt-4">
+    <button class="btn btn-primary" type="submit"><%= project ? 'Save changes' : 'Create project' %></button>
+  </div>
+</form>
