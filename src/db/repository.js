@@ -172,15 +172,15 @@ function upsertChapter(projectId, chapter) {
   const payload = {
     project_id: projectId,
     chapter_number: chapter.chapter_number,
-    title: chapter.title || `Chapter ${chapter.chapter_number}`,
-    outline: chapter.outline || '',
-    content: chapter.content || '',
-    summary: chapter.summary || '',
+    title: serialize(chapter.title) || `Chapter ${chapter.chapter_number}`,
+    outline: serialize(chapter.outline),
+    content: serialize(chapter.content),
+    summary: serialize(chapter.summary),
     claims_list: serialize(chapter.claims_list),
     references_needed: serialize(chapter.references_needed),
     open_questions: serialize(chapter.open_questions),
     factual_uncertainty_notes: serialize(chapter.factual_uncertainty_notes),
-    status: chapter.status || 'draft',
+    status: serialize(chapter.status) || 'draft',
     updated_at: now()
   };
 
@@ -240,7 +240,14 @@ function updateChapter(id, data) {
     UPDATE chapters
     SET title = @title, content = @content, status = @status, updated_at = @updated_at
     WHERE id = @id
-  `).run({ ...data, id, updated_at: now() });
+  `).run({
+    ...data,
+    title: serialize(data.title),
+    content: serialize(data.content),
+    status: serialize(data.status) || 'draft',
+    id,
+    updated_at: now()
+  });
 }
 
 function addLog(projectId, step, status, message, chapterId = null) {
