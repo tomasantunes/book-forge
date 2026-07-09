@@ -21,6 +21,14 @@
       <input class="form-control" id="subtitle" name="subtitle" value="<%= project?.subtitle || '' %>">
     </div>
     <div class="col-12">
+      <label class="form-label" for="book_type">Book Type</label>
+      <select class="form-select" id="book_type" name="book_type">
+        <option value="fiction" <%= (project?.book_type || 'fiction') === 'fiction' ? 'selected' : '' %>>Fiction</option>
+        <option value="non_fiction" <%= project?.book_type === 'non_fiction' ? 'selected' : '' %>>Non-fiction</option>
+      </select>
+      <div class="form-text">Fiction uses story, character, plot, and continuity planning.<br>Non-fiction uses thesis, structure, source material, arguments, research notes, and fact-checking.</div>
+    </div>
+    <div class="col-12">
       <label class="form-label" for="description">Description</label>
       <textarea class="form-control" id="description" name="description" rows="3"><%= project?.description || '' %></textarea>
     </div>

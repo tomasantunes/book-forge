@@ -11,7 +11,18 @@ function esc(value) {
     .replace(/"/g, '&quot;');
 }
 
-function buildPreviewHtml(project, chapters) {
+function nonFictionAppendices(project, chapters, plan) {
+  if (project.book_type !== 'non_fiction') return '';
+  const references = chapters.filter((chapter) => chapter.references_needed)
+    .map((chapter) => `<h2>Chapter ${chapter.chapter_number}: ${esc(chapter.title)}</h2><pre>${esc(chapter.references_needed)}</pre>`)
+    .join('');
+  const appendix = [plan?.research_gaps, plan?.fact_checking_notes, ...chapters.map((chapter) => chapter.factual_uncertainty_notes)]
+    .filter(Boolean).map((value) => `<pre>${esc(value)}</pre>`).join('');
+  return `${references ? `<section class="chapter"><h1>References needed</h1>${references}</section>` : ''}
+    ${appendix ? `<section class="chapter"><h1>Research and factual uncertainty appendix</h1>${appendix}</section>` : ''}`;
+}
+
+function buildPreviewHtml(project, chapters, plan = null) {
   const cover = project.cover_image_path
     ? `<div class="cover-page"><img src="/${project.cover_image_path.replace(/\\/g, '/')}" alt="Cover"></div>`
     : '';
@@ -40,7 +51,7 @@ function buildPreviewHtml(project, chapters) {
   ${cover}
   <section class="title-page"><h1>${esc(project.title)}</h1>${project.subtitle ? `<h2>${esc(project.subtitle)}</h2>` : ''}${project.author ? `<div class="author">by ${esc(project.author)}</div>` : ''}</section>
   <section class="toc"><h1>Table of Contents</h1><ol>${toc}</ol></section>
-  ${body}</body></html>`;
+  ${body}${nonFictionAppendices(project, chapters, plan)}</body></html>`;
 }
 
 function addPageNumber(doc) {
@@ -76,7 +87,7 @@ function writeMarkdownLikeText(doc, content) {
   }
 }
 
-function exportPdf(project, chapters) {
+function exportPdf(project, chapters, plan = null) {
   return new Promise((resolve, reject) => {
     const exportDir = path.join(process.cwd(), 'exports');
     fs.mkdirSync(exportDir, { recursive: true });
@@ -119,6 +130,27 @@ function exportPdf(project, chapters) {
       doc.moveDown(1.5);
       writeMarkdownLikeText(doc, chapter.content);
     });
+
+    if (project.book_type === 'non_fiction') {
+      const references = chapters.filter((chapter) => chapter.references_needed);
+      if (references.length) {
+        doc.addPage().font('Times-Bold').fontSize(24).text('References needed').moveDown();
+        references.forEach((chapter) => {
+          doc.font('Times-Bold').fontSize(13).text(`Chapter ${chapter.chapter_number}: ${chapter.title}`);
+          writeMarkdownLikeText(doc, chapter.references_needed);
+          doc.moveDown();
+        });
+      }
+      const uncertainty = [
+        plan?.research_gaps,
+        plan?.fact_checking_notes,
+        ...chapters.map((chapter) => chapter.factual_uncertainty_notes)
+      ].filter(Boolean);
+      if (uncertainty.length) {
+        doc.addPage().font('Times-Bold').fontSize(24).text('Research and factual uncertainty appendix').moveDown();
+        uncertainty.forEach((item) => writeMarkdownLikeText(doc, item));
+      }
+    }
 
     addPageNumber(doc);
     doc.end();

@@ -3,6 +3,7 @@
     <div class="d-flex align-items-center gap-2">
       <h1 class="h3 mb-1"><%= project.title %></h1>
       <span class="badge text-bg-secondary"><%= project.genre || 'Book' %></span>
+      <span class="badge text-bg-light border"><%= project.book_type === 'non_fiction' ? 'Non-fiction' : 'Fiction' %></span>
     </div>
     <p class="text-secondary mb-0"><%= project.subtitle || project.description || 'No description provided.' %></p>
   </div>
@@ -49,7 +50,7 @@
       <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
         <div>
           <h2 class="h5 mb-1">Book plan</h2>
-          <p class="small text-secondary mb-0">Concept, outline, book bible, style, and continuity.</p>
+          <p class="small text-secondary mb-0"><%= project.book_type === 'non_fiction' ? 'Thesis, source analysis, claims, research gaps, and fact-checking.' : 'Concept, outline, book bible, style, and continuity.' %></p>
         </div>
         <form method="post" action="/projects/<%= project.id %>/generation/plan" data-loading-form>
           <button class="btn btn-primary" type="submit"><%= plan ? 'Regenerate Book Plan' : 'Generate Book Plan' %></button>
@@ -57,7 +58,19 @@
       </div>
       <% if (plan) { %>
         <div class="accordion" id="planAccordion">
-          <% [
+          <% const planSections = project.book_type === 'non_fiction' ? [
+            ['Book concept', plan.concept],
+            ['Central thesis', plan.central_thesis],
+            ['Target reader', plan.target_reader],
+            ['Table of contents', plan.chapter_list],
+            ['Chapter outlines', plan.detailed_outline],
+            ['Source summary', plan.source_summary],
+            ['Key terms', plan.key_terms],
+            ['Main claims', plan.main_claims],
+            ['Research gaps', plan.research_gaps],
+            ['Fact-checking notes', plan.fact_checking_notes],
+            ['Tone and style', plan.style_guide]
+          ] : [
             ['Concept', plan.concept],
             ['Detailed outline', plan.detailed_outline],
             ['Chapter list', plan.chapter_list],
@@ -65,7 +78,7 @@
             ['Style guide', plan.style_guide],
             ['Characters and locations', plan.character_location_notes],
             ['Continuity notes', plan.continuity_notes]
-          ].forEach(([label, value], index) => { %>
+          ]; planSections.forEach(([label, value], index) => { %>
             <div class="accordion-item">
               <h3 class="accordion-header">
                 <button class="accordion-button <%= index ? 'collapsed' : '' %>" type="button" data-bs-toggle="collapse" data-bs-target="#plan<%= index %>"><%= label %></button>
@@ -85,7 +98,7 @@
       <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
         <div>
           <h2 class="h5 mb-1">Chapters</h2>
-          <p class="small text-secondary mb-0">Generated sequentially with summaries and continuity updates.</p>
+          <p class="small text-secondary mb-0"><%= project.book_type === 'non_fiction' ? 'Generated sequentially with claim, reference, and uncertainty reviews.' : 'Generated sequentially with summaries and continuity updates.' %></p>
         </div>
         <div class="d-flex gap-2">
           <a class="btn btn-outline-secondary" href="/projects/<%= project.id %>/chapters">Review</a>
@@ -114,6 +127,7 @@
       <% } %>
       <h2 class="h6">Project target</h2>
       <dl class="row small mb-0">
+        <dt class="col-5 text-secondary">Type</dt><dd class="col-7"><%= project.book_type === 'non_fiction' ? 'Non-fiction' : 'Fiction' %></dd>
         <dt class="col-5 text-secondary">Author</dt><dd class="col-7"><%= project.author || '—' %></dd>
         <dt class="col-5 text-secondary">Language</dt><dd class="col-7"><%= project.target_language %></dd>
         <dt class="col-5 text-secondary">Words</dt><dd class="col-7"><%= Number(project.target_word_count).toLocaleString() %></dd>

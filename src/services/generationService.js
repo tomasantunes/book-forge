@@ -17,7 +17,7 @@ async function generatePlan(projectId) {
 
   for (const file of files) {
     if (!file.summary) {
-      const summary = await ai.summarizeSourceFile(file);
+      const summary = await ai.summarizeSourceFile(file, project.book_type);
       repo.updateFileSummary(file.id, summary);
     }
   }
@@ -71,12 +71,17 @@ async function generateSingleChapter(projectId, chapterNumber, force = false) {
 
   const savedChapter = repo.getChapterByNumber(projectId, chapterNumber);
   repo.addLog(projectId, 'chapter_summary', 'running', `Summarizing chapter ${chapterNumber}`, savedChapter.id);
-  const summary = await ai.summarizeChapter(savedChapter);
+  const summary = await ai.summarizeChapter(savedChapter, project);
   repo.upsertChapter(projectId, { ...savedChapter, summary, status: 'generated' });
 
   const finalChapter = repo.getChapterByNumber(projectId, chapterNumber);
-  const continuity = await ai.updateContinuity(project, repo.getBookPlan(projectId), finalChapter);
-  repo.updateContinuity(projectId, continuity.continuity_notes || '', continuity.book_bible || null);
+  if (project.book_type === 'non_fiction') {
+    const audit = await ai.analyzeNonFictionChapter(project, repo.getBookPlan(projectId), finalChapter);
+    repo.upsertChapter(projectId, { ...finalChapter, ...audit, status: 'generated' });
+  } else {
+    const continuity = await ai.updateContinuity(project, repo.getBookPlan(projectId), finalChapter);
+    repo.updateContinuity(projectId, continuity.continuity_notes || '', continuity.book_bible || null);
+  }
   repo.addLog(projectId, 'chapter_generation', 'success', `Chapter ${chapterNumber} generated`, savedChapter.id);
   return savedChapter.id;
 }
@@ -93,6 +98,13 @@ async function generateAllChapters(projectId) {
   const total = Number(project.target_chapter_count || 1);
   for (let chapterNumber = 1; chapterNumber <= total; chapterNumber += 1) {
     await generateSingleChapter(projectId, chapterNumber, false);
+  }
+
+  if (project.book_type === 'non_fiction') {
+    repo.addLog(projectId, 'fact_check_review', 'running', 'Reviewing consistency and factual uncertainty');
+    const review = await ai.reviewNonFictionBook(project, repo.getBookPlan(projectId), repo.listChapters(projectId));
+    repo.updateNonFictionReview(projectId, review);
+    repo.addLog(projectId, 'fact_check_review', 'success', 'Consistency and fact-checking review completed');
   }
 }
 

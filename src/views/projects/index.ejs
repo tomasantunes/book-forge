@@ -33,7 +33,7 @@
               <% if (item.subtitle) { %><div class="small text-secondary"><%= item.subtitle %></div><% } %>
             </td>
             <td><%= item.author || '—' %></td>
-            <td><%= item.genre || '—' %></td>
+            <td><%= item.genre || '—' %> <span class="badge text-bg-light border"><%= item.book_type === 'non_fiction' ? 'Non-fiction' : 'Fiction' %></span></td>
             <td><%= item.target_chapter_count %> chapters / <%= Number(item.target_word_count).toLocaleString() %> words</td>
             <td><%= new Date(item.updated_at).toLocaleDateString() %></td>
             <td class="text-end"><a class="btn btn-sm btn-outline-secondary" href="/projects/<%= item.id %>">Open</a></td>

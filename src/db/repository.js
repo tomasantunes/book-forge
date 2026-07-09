@@ -16,11 +16,11 @@ function createProject(data) {
   const stmt = db.prepare(`
     INSERT INTO projects (
       title, subtitle, author, description, guidance_prompt, target_language,
-      target_word_count, target_chapter_count, genre, tone, audience, cover_image_path,
+      target_word_count, target_chapter_count, genre, tone, audience, book_type, cover_image_path,
       created_at, updated_at
     ) VALUES (
       @title, @subtitle, @author, @description, @guidance_prompt, @target_language,
-      @target_word_count, @target_chapter_count, @genre, @tone, @audience, @cover_image_path,
+      @target_word_count, @target_chapter_count, @genre, @tone, @audience, @book_type, @cover_image_path,
       @created_at, @updated_at
     )
   `);
@@ -43,6 +43,7 @@ function updateProject(id, data) {
       genre = @genre,
       tone = @tone,
       audience = @audience,
+      book_type = @book_type,
       cover_image_path = COALESCE(@cover_image_path, cover_image_path),
       updated_at = @updated_at
     WHERE id = @id
@@ -80,14 +81,20 @@ function upsertBookPlan(projectId, plan) {
   const existing = getBookPlan(projectId);
   const payload = {
     project_id: projectId,
-    concept: plan.concept || '',
-    detailed_outline: plan.detailed_outline || '',
-    chapter_list: plan.chapter_list || '',
-    book_bible: plan.book_bible || '',
-    style_guide: plan.style_guide || '',
-    character_location_notes: plan.character_location_notes || '',
-    continuity_notes: plan.continuity_notes || '',
-    source_summary: plan.source_summary || '',
+    concept: serialize(plan.concept || plan.book_concept),
+    detailed_outline: serialize(plan.detailed_outline || plan.chapter_outlines),
+    chapter_list: serialize(plan.chapter_list || plan.table_of_contents),
+    book_bible: serialize(plan.book_bible),
+    style_guide: serialize(plan.style_guide || plan.tone_and_style),
+    character_location_notes: serialize(plan.character_location_notes),
+    continuity_notes: serialize(plan.continuity_notes),
+    source_summary: serialize(plan.source_summary || plan.source_material_summary),
+    central_thesis: plan.central_thesis || '',
+    target_reader: plan.target_reader || '',
+    key_terms: serialize(plan.key_terms),
+    main_claims: serialize(plan.main_claims),
+    research_gaps: serialize(plan.research_gaps),
+    fact_checking_notes: serialize(plan.fact_checking_notes),
     updated_at: now()
   };
 
@@ -102,6 +109,12 @@ function upsertBookPlan(projectId, plan) {
         character_location_notes = @character_location_notes,
         continuity_notes = @continuity_notes,
         source_summary = @source_summary,
+        central_thesis = @central_thesis,
+        target_reader = @target_reader,
+        key_terms = @key_terms,
+        main_claims = @main_claims,
+        research_gaps = @research_gaps,
+        fact_checking_notes = @fact_checking_notes,
         updated_at = @updated_at
       WHERE project_id = @project_id
     `).run(payload);
@@ -112,11 +125,35 @@ function upsertBookPlan(projectId, plan) {
     INSERT INTO book_plans (
       project_id, concept, detailed_outline, chapter_list, book_bible, style_guide,
       character_location_notes, continuity_notes, source_summary, created_at, updated_at
+      , central_thesis, target_reader, key_terms, main_claims, research_gaps, fact_checking_notes
     ) VALUES (
       @project_id, @concept, @detailed_outline, @chapter_list, @book_bible, @style_guide,
       @character_location_notes, @continuity_notes, @source_summary, @created_at, @updated_at
+      , @central_thesis, @target_reader, @key_terms, @main_claims, @research_gaps, @fact_checking_notes
     )
   `).run({ ...payload, created_at: now() }).lastInsertRowid;
+}
+
+function serialize(value) {
+  if (Array.isArray(value) || (value && typeof value === 'object')) return JSON.stringify(value, null, 2);
+  return value || '';
+}
+
+function updateNonFictionReview(projectId, review) {
+  db.prepare(`
+    UPDATE book_plans SET
+      main_claims = @main_claims,
+      research_gaps = @research_gaps,
+      fact_checking_notes = @fact_checking_notes,
+      updated_at = @updated_at
+    WHERE project_id = @project_id
+  `).run({
+    project_id: projectId,
+    main_claims: serialize(review.main_claims),
+    research_gaps: serialize(review.research_gaps),
+    fact_checking_notes: serialize(review.fact_checking_notes),
+    updated_at: now()
+  });
 }
 
 function updateContinuity(projectId, continuityNotes, bookBible) {
@@ -139,6 +176,10 @@ function upsertChapter(projectId, chapter) {
     outline: chapter.outline || '',
     content: chapter.content || '',
     summary: chapter.summary || '',
+    claims_list: serialize(chapter.claims_list),
+    references_needed: serialize(chapter.references_needed),
+    open_questions: serialize(chapter.open_questions),
+    factual_uncertainty_notes: serialize(chapter.factual_uncertainty_notes),
     status: chapter.status || 'draft',
     updated_at: now()
   };
@@ -151,6 +192,10 @@ function upsertChapter(projectId, chapter) {
         outline = @outline,
         content = @content,
         summary = @summary,
+        claims_list = @claims_list,
+        references_needed = @references_needed,
+        open_questions = @open_questions,
+        factual_uncertainty_notes = @factual_uncertainty_notes,
         status = @status,
         updated_at = @updated_at
       WHERE project_id = @project_id AND chapter_number = @chapter_number
@@ -161,8 +206,10 @@ function upsertChapter(projectId, chapter) {
   return db.prepare(`
     INSERT INTO chapters (
       project_id, chapter_number, title, outline, content, summary, status, created_at, updated_at
+      , claims_list, references_needed, open_questions, factual_uncertainty_notes
     ) VALUES (
       @project_id, @chapter_number, @title, @outline, @content, @summary, @status, @created_at, @updated_at
+      , @claims_list, @references_needed, @open_questions, @factual_uncertainty_notes
     )
   `).run({ ...payload, created_at: now() }).lastInsertRowid;
 }
@@ -225,6 +272,7 @@ module.exports = {
   deleteProjectFile,
   upsertBookPlan,
   updateContinuity,
+  updateNonFictionReview,
   getBookPlan,
   upsertChapter,
   listChapters,

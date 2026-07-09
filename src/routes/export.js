@@ -15,7 +15,7 @@ router.get('/preview', (req, res) => {
     layout: false,
     project,
     chapters: exportable(project.id),
-    previewHtml: pdf.buildPreviewHtml(project, exportable(project.id))
+    previewHtml: pdf.buildPreviewHtml(project, exportable(project.id), repo.getBookPlan(project.id))
   });
 });
 
@@ -25,7 +25,7 @@ router.post('/pdf', async (req, res, next) => {
     if (!project) return res.status(404).send('Project not found');
     const chapters = exportable(project.id);
     if (!chapters.length) throw new Error('Generate at least one chapter before exporting.');
-    const outputPath = await pdf.exportPdf(project, chapters);
+    const outputPath = await pdf.exportPdf(project, chapters, repo.getBookPlan(project.id));
     repo.addLog(project.id, 'pdf_export', 'success', `PDF exported to ${outputPath}`);
     res.download(require('path').resolve(process.cwd(), outputPath));
   } catch (error) {

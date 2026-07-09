@@ -40,6 +40,16 @@
         <p class="small text-secondary" style="white-space: pre-wrap"><%= chapter.outline || 'No outline.' %></p>
         <h2 class="h6 mt-4">Summary</h2>
         <p class="small text-secondary mb-0" style="white-space: pre-wrap"><%= chapter.summary || 'No summary yet.' %></p>
+        <% if (project.book_type === 'non_fiction') { %>
+          <h2 class="h6 mt-4">Claims in this chapter</h2>
+          <p class="small text-secondary" style="white-space: pre-wrap"><%= chapter.claims_list || 'No claims audit yet.' %></p>
+          <h2 class="h6 mt-4">References needed</h2>
+          <p class="small text-secondary" style="white-space: pre-wrap"><%= chapter.references_needed || 'References needed' %></p>
+          <h2 class="h6 mt-4">Open questions</h2>
+          <p class="small text-secondary" style="white-space: pre-wrap"><%= chapter.open_questions || 'No open questions recorded.' %></p>
+          <h2 class="h6 mt-4">Factual uncertainty notes</h2>
+          <p class="small text-secondary mb-0" style="white-space: pre-wrap"><%= chapter.factual_uncertainty_notes || 'No uncertainty audit yet.' %></p>
+        <% } %>
       </div>
     </div>
   </div>

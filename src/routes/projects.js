@@ -22,6 +22,7 @@ const coverUpload = multer({
 });
 
 function payload(body, coverPath = null) {
+  const bookType = body.book_type === 'non_fiction' ? 'non_fiction' : 'fiction';
   return {
     title: String(body.title || '').trim(),
     subtitle: String(body.subtitle || '').trim(),
@@ -34,6 +35,7 @@ function payload(body, coverPath = null) {
     genre: String(body.genre || '').trim(),
     tone: String(body.tone || '').trim(),
     audience: String(body.audience || '').trim(),
+    book_type: bookType,
     cover_image_path: coverPath
   };
 }

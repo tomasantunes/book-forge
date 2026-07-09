@@ -1,5 +1,12 @@
 const db = require('./database');
 
+function addColumnIfMissing(table, column, definition) {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all();
+  if (!columns.some((item) => item.name === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
+}
+
 function ensureDatabase() {
   db.exec(`
     CREATE TABLE IF NOT EXISTS projects (
@@ -9,6 +16,7 @@ function ensureDatabase() {
       author TEXT,
       description TEXT,
       guidance_prompt TEXT,
+      book_type TEXT NOT NULL DEFAULT 'fiction',
       target_language TEXT DEFAULT 'English',
       target_word_count INTEGER DEFAULT 50000,
       target_chapter_count INTEGER DEFAULT 10,
@@ -42,6 +50,12 @@ function ensureDatabase() {
       character_location_notes TEXT,
       continuity_notes TEXT,
       source_summary TEXT,
+      central_thesis TEXT,
+      target_reader TEXT,
+      key_terms TEXT,
+      main_claims TEXT,
+      research_gaps TEXT,
+      fact_checking_notes TEXT,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
@@ -55,6 +69,10 @@ function ensureDatabase() {
       outline TEXT,
       content TEXT,
       summary TEXT,
+      claims_list TEXT,
+      references_needed TEXT,
+      open_questions TEXT,
+      factual_uncertainty_notes TEXT,
       status TEXT NOT NULL DEFAULT 'draft',
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -74,6 +92,18 @@ function ensureDatabase() {
       FOREIGN KEY(chapter_id) REFERENCES chapters(id) ON DELETE SET NULL
     );
   `);
+
+  addColumnIfMissing('projects', 'book_type', "TEXT NOT NULL DEFAULT 'fiction'");
+  addColumnIfMissing('book_plans', 'central_thesis', 'TEXT');
+  addColumnIfMissing('book_plans', 'target_reader', 'TEXT');
+  addColumnIfMissing('book_plans', 'key_terms', 'TEXT');
+  addColumnIfMissing('book_plans', 'main_claims', 'TEXT');
+  addColumnIfMissing('book_plans', 'research_gaps', 'TEXT');
+  addColumnIfMissing('book_plans', 'fact_checking_notes', 'TEXT');
+  addColumnIfMissing('chapters', 'claims_list', 'TEXT');
+  addColumnIfMissing('chapters', 'references_needed', 'TEXT');
+  addColumnIfMissing('chapters', 'open_questions', 'TEXT');
+  addColumnIfMissing('chapters', 'factual_uncertainty_notes', 'TEXT');
 }
 
 if (require.main === module) {
