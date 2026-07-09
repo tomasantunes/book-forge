@@ -38,6 +38,9 @@
                   <button class="btn btn-sm btn-outline-success" type="submit">Approve</button>
                 </form>
               <% } %>
+              <form method="post" action="/projects/<%= project.id %>/chapters/<%= chapter.id %>?_method=DELETE" onsubmit="return confirm('Delete this chapter?')">
+                <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+              </form>
             </div>
           </td>
         </tr>

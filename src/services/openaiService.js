@@ -164,8 +164,11 @@ async function generateChapterOutline(project, plan, chapterNumber) {
     : generateFictionChapterOutline(project, plan, chapterNumber);
 }
 
-async function generateFictionChapter(project, plan, files, chapter, previousChapter) {
+async function generateFictionChapter(project, plan, files, chapter, previousChapter, rewritePrompt = '') {
   const sourceContext = sourceSummaries(files, 2500);
+  const rewriteInstruction = rewritePrompt
+    ? `\nRewrite direction from the user:\n${rewritePrompt}\n\nFollow this direction while staying consistent with the project, source material, chapter position, and established continuity.`
+    : '';
   return completeText(
     'You write polished, coherent book chapters from structured planning context. Use markdown headings only where useful.',
     `Write chapter ${chapter.chapter_number} in ${project.target_language || 'English'}.
@@ -200,11 +203,16 @@ ${chapter.outline || ''}
 Previous chapter summary:
 ${previousChapter?.summary || 'This is the first chapter.'}
 
+${rewriteInstruction}
+
 Write a complete chapter. Stay consistent with source material, plan, and continuity.`
   );
 }
 
-async function generateNonFictionChapter(project, plan, files, chapter, previousChapter) {
+async function generateNonFictionChapter(project, plan, files, chapter, previousChapter, rewritePrompt = '') {
+  const rewriteInstruction = rewritePrompt
+    ? `\nRewrite direction from the user:\n${rewritePrompt}\n\nFollow this direction while preserving factual discipline. Do not invent facts, quotations, citations, or references. Mark unsupported claims as [NEEDS VERIFICATION].`
+    : '';
   return completeText(
     'You write clear, structured, factual non-fiction. Never invent facts, quotations, citations, or references. When evidence is absent or uncertain, explicitly write [NEEDS VERIFICATION]. Do not add fictional characters, plot, world-building, or continuity.',
     `Write chapter ${chapter.chapter_number} in ${project.target_language || 'English'}.
@@ -242,14 +250,16 @@ ${plan.main_claims || ''}
 Factual uncertainty notes:
 ${plan.fact_checking_notes || ''}
 
+${rewriteInstruction}
+
 Use an introduction, main argument, supporting sections, examples, practical implications, and a short conclusion where appropriate. Only rely on supplied evidence. Mark claims that need support as [NEEDS VERIFICATION]. Do not fabricate a bibliography.`
   );
 }
 
-async function generateChapter(project, plan, files, chapter, previousChapter) {
+async function generateChapter(project, plan, files, chapter, previousChapter, rewritePrompt = '') {
   return project.book_type === 'non_fiction'
-    ? generateNonFictionChapter(project, plan, files, chapter, previousChapter)
-    : generateFictionChapter(project, plan, files, chapter, previousChapter);
+    ? generateNonFictionChapter(project, plan, files, chapter, previousChapter, rewritePrompt)
+    : generateFictionChapter(project, plan, files, chapter, previousChapter, rewritePrompt);
 }
 
 async function summarizeChapter(chapter, project = {}) {

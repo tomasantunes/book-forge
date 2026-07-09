@@ -4,16 +4,16 @@
     <h1 class="h3 mb-0"><%= chapter.title %></h1>
   </div>
   <div class="d-flex gap-2">
-    <form method="post" action="/projects/<%= project.id %>/chapters/<%= chapter.id %>/regenerate" data-loading-form onsubmit="return confirm('Replace the current chapter content?')">
-      <button class="btn btn-outline-primary" type="submit">Regenerate</button>
-    </form>
     <a class="btn btn-outline-secondary" href="/projects/<%= project.id %>/chapters">Back</a>
+    <form method="post" action="/projects/<%= project.id %>/chapters/<%= chapter.id %>?_method=DELETE" onsubmit="return confirm('Delete this chapter?')">
+      <button class="btn btn-outline-danger" type="submit">Delete</button>
+    </form>
   </div>
 </div>
 
-<form method="post" action="/projects/<%= project.id %>/chapters/<%= chapter.id %>?_method=PUT">
-  <div class="row g-4">
-    <div class="col-xl-9">
+<div class="row g-4">
+  <div class="col-xl-9">
+    <form id="saveChapterForm" method="post" action="/projects/<%= project.id %>/chapters/<%= chapter.id %>?_method=PUT">
       <div class="bg-white border rounded p-4">
         <div class="mb-3">
           <label class="form-label" for="title">Chapter title</label>
@@ -24,33 +24,43 @@
           <textarea class="form-control chapter-editor" id="content" name="content"><%= chapter.content || '' %></textarea>
         </div>
       </div>
+    </form>
+  </div>
+  <div class="col-xl-3">
+    <div class="bg-white border rounded p-4 mb-4">
+      <label class="form-label" for="status">Status</label>
+      <select class="form-select mb-3" id="status" name="status" form="saveChapterForm">
+        <% ['planned', 'draft', 'generated', 'approved'].forEach((status) => { %>
+          <option value="<%= status %>" <%= chapter.status === status ? 'selected' : '' %>><%= status %></option>
+        <% }) %>
+      </select>
+      <button class="btn btn-primary w-100" type="submit" form="saveChapterForm">Save chapter</button>
     </div>
-    <div class="col-xl-3">
-      <div class="bg-white border rounded p-4 mb-4">
-        <label class="form-label" for="status">Status</label>
-        <select class="form-select mb-3" id="status" name="status">
-          <% ['planned', 'draft', 'generated', 'approved'].forEach((status) => { %>
-            <option value="<%= status %>" <%= chapter.status === status ? 'selected' : '' %>><%= status %></option>
-          <% }) %>
-        </select>
-        <button class="btn btn-primary w-100" type="submit">Save chapter</button>
-      </div>
-      <div class="bg-white border rounded p-4">
-        <h2 class="h6">Outline</h2>
-        <p class="small text-secondary" style="white-space: pre-wrap"><%= chapter.outline || 'No outline.' %></p>
-        <h2 class="h6 mt-4">Summary</h2>
-        <p class="small text-secondary mb-0" style="white-space: pre-wrap"><%= chapter.summary || 'No summary yet.' %></p>
-        <% if (project.book_type === 'non_fiction') { %>
-          <h2 class="h6 mt-4">Claims in this chapter</h2>
-          <p class="small text-secondary" style="white-space: pre-wrap"><%= chapter.claims_list || 'No claims audit yet.' %></p>
-          <h2 class="h6 mt-4">References needed</h2>
-          <p class="small text-secondary" style="white-space: pre-wrap"><%= chapter.references_needed || 'References needed' %></p>
-          <h2 class="h6 mt-4">Open questions</h2>
-          <p class="small text-secondary" style="white-space: pre-wrap"><%= chapter.open_questions || 'No open questions recorded.' %></p>
-          <h2 class="h6 mt-4">Factual uncertainty notes</h2>
-          <p class="small text-secondary mb-0" style="white-space: pre-wrap"><%= chapter.factual_uncertainty_notes || 'No uncertainty audit yet.' %></p>
-        <% } %>
-      </div>
+    <div class="bg-white border rounded p-4 mb-4">
+      <h2 class="h6">Rewrite with prompt</h2>
+      <form method="post" action="/projects/<%= project.id %>/chapters/<%= chapter.id %>/regenerate" data-loading-form onsubmit="return confirm('Replace the current chapter content?')">
+        <div class="mb-3">
+          <label class="form-label small text-secondary" for="rewrite_prompt">Optional direction</label>
+          <textarea class="form-control" id="rewrite_prompt" name="rewrite_prompt" rows="5" placeholder="Example: Rewrite this chapter to focus on the pricing strategy instead of onboarding."></textarea>
+        </div>
+        <button class="btn btn-outline-primary w-100" type="submit">Regenerate chapter</button>
+      </form>
+    </div>
+    <div class="bg-white border rounded p-4">
+      <h2 class="h6">Outline</h2>
+      <p class="small text-secondary" style="white-space: pre-wrap"><%= chapter.outline || 'No outline.' %></p>
+      <h2 class="h6 mt-4">Summary</h2>
+      <p class="small text-secondary mb-0" style="white-space: pre-wrap"><%= chapter.summary || 'No summary yet.' %></p>
+      <% if (project.book_type === 'non_fiction') { %>
+        <h2 class="h6 mt-4">Claims in this chapter</h2>
+        <p class="small text-secondary" style="white-space: pre-wrap"><%= chapter.claims_list || 'No claims audit yet.' %></p>
+        <h2 class="h6 mt-4">References needed</h2>
+        <p class="small text-secondary" style="white-space: pre-wrap"><%= chapter.references_needed || 'References needed' %></p>
+        <h2 class="h6 mt-4">Open questions</h2>
+        <p class="small text-secondary" style="white-space: pre-wrap"><%= chapter.open_questions || 'No open questions recorded.' %></p>
+        <h2 class="h6 mt-4">Factual uncertainty notes</h2>
+        <p class="small text-secondary mb-0" style="white-space: pre-wrap"><%= chapter.factual_uncertainty_notes || 'No uncertainty audit yet.' %></p>
+      <% } %>
     </div>
   </div>
-</form>
+</div>

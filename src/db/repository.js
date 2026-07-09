@@ -235,6 +235,10 @@ function getPreviousChapter(projectId, chapterNumber) {
   `).get(projectId, chapterNumber);
 }
 
+function deleteChapter(projectId, chapterId) {
+  db.prepare('DELETE FROM chapters WHERE project_id = ? AND id = ?').run(projectId, chapterId);
+}
+
 function updateChapter(id, data) {
   db.prepare(`
     UPDATE chapters
@@ -286,6 +290,7 @@ module.exports = {
   getChapter,
   getChapterByNumber,
   getPreviousChapter,
+  deleteChapter,
   updateChapter,
   addLog,
   listLogs

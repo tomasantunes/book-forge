@@ -44,12 +44,23 @@ router.post('/:chapterId/regenerate', async (req, res, next) => {
     if (!chapter || Number(chapter.project_id) !== Number(req.params.projectId)) {
       return res.status(404).send('Chapter not found');
     }
-    await generation.generateSingleChapter(req.params.projectId, chapter.chapter_number, true);
+    const rewritePrompt = String(req.body.rewrite_prompt || '').trim();
+    await generation.generateSingleChapter(req.params.projectId, chapter.chapter_number, true, rewritePrompt);
     res.redirect(`/projects/${req.params.projectId}/chapters/${chapter.id}/edit?success=${encodeURIComponent('Chapter regenerated')}`);
   } catch (error) {
     repo.addLog(req.params.projectId, 'chapter_regeneration', 'failed', error.message, req.params.chapterId);
     next(error);
   }
+});
+
+router.delete('/:chapterId', (req, res) => {
+  const chapter = repo.getChapter(req.params.chapterId);
+  if (!chapter || Number(chapter.project_id) !== Number(req.params.projectId)) {
+    return res.status(404).send('Chapter not found');
+  }
+  repo.addLog(req.params.projectId, 'chapter_delete', 'success', `Deleted chapter ${chapter.chapter_number}`, chapter.id);
+  repo.deleteChapter(req.params.projectId, chapter.id);
+  res.redirect(`/projects/${req.params.projectId}/chapters?success=${encodeURIComponent('Chapter deleted')}`);
 });
 
 router.post('/:chapterId/approve', (req, res) => {

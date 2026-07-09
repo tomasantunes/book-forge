@@ -49,7 +49,7 @@ async function ensureChapterOutlines(project, plan) {
   }
 }
 
-async function generateSingleChapter(projectId, chapterNumber, force = false) {
+async function generateSingleChapter(projectId, chapterNumber, force = false, rewritePrompt = '') {
   const project = requireProject(projectId);
   let plan = repo.getBookPlan(projectId);
   if (!plan) {
@@ -66,7 +66,7 @@ async function generateSingleChapter(projectId, chapterNumber, force = false) {
 
   const previousChapter = repo.getPreviousChapter(projectId, chapterNumber);
   repo.addLog(projectId, 'chapter_generation', 'running', `Generating chapter ${chapterNumber}`, chapter.id);
-  const content = await ai.generateChapter(project, plan, files, chapter, previousChapter);
+  const content = await ai.generateChapter(project, plan, files, chapter, previousChapter, rewritePrompt);
   repo.upsertChapter(projectId, { ...chapter, content, status: 'generated' });
 
   const savedChapter = repo.getChapterByNumber(projectId, chapterNumber);
