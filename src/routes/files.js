@@ -7,6 +7,8 @@ const repo = require('../db/repository');
 
 const router = express.Router({ mergeParams: true });
 const uploadDir = path.join(process.cwd(), 'uploads', 'sources');
+const textExtensions = new Set(['.txt', '.md']);
+const imageExtensions = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif']);
 fs.mkdirSync(uploadDir, { recursive: true });
 
 const upload = multer({
@@ -20,19 +22,23 @@ const upload = multer({
   },
   fileFilter: (req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
-    const allowed = ['.txt', '.md'].includes(ext);
-    cb(allowed ? null : new Error('Only .txt and .md source files are allowed.'), allowed);
+    const allowed = textExtensions.has(ext) || imageExtensions.has(ext);
+    cb(allowed ? null : new Error('Only .txt, .md, PNG, JPEG, WebP, and GIF source files are allowed.'), allowed);
   }
 });
 
 router.post('/', upload.array('source_files', 20), (req, res) => {
   const project = repo.getProject(req.params.projectId);
   if (!project) return res.status(404).send('Project not found');
-  if (!req.files?.length) throw new Error('Choose at least one .txt or .md file.');
+  if (!req.files?.length) throw new Error('Choose at least one text, Markdown, or image file.');
 
   for (const file of req.files) {
-    const extractedText = fs.readFileSync(file.path, 'utf8').trim();
-    if (!extractedText) {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const isImage = imageExtensions.has(ext);
+    const extractedText = isImage
+      ? `[Image source: ${file.originalname}]`
+      : fs.readFileSync(file.path, 'utf8').trim();
+    if (!isImage && !extractedText) {
       fs.unlinkSync(file.path);
       continue;
     }

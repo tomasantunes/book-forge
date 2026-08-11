@@ -36,6 +36,13 @@
       <label class="form-label" for="guidance_prompt">Guidance prompt</label>
       <textarea class="form-control" id="guidance_prompt" name="guidance_prompt" rows="6" placeholder="Explain the book's purpose, themes, required structure, constraints, and source handling."><%= project?.guidance_prompt || '' %></textarea>
     </div>
+    <div class="col-12">
+      <div class="form-check border rounded p-3 ps-5">
+        <input class="form-check-input" type="checkbox" value="1" id="web_search_enabled" name="web_search_enabled" <%= Number(project?.web_search_enabled || 0) ? 'checked' : '' %>>
+        <label class="form-check-label fw-medium" for="web_search_enabled">Research additional information on the internet</label>
+        <div class="form-text">Allows the AI to search the web while planning and writing chapters, adding relevant current context and sources. This may increase generation time and API usage.</div>
+      </div>
+    </div>
     <div class="col-md-4">
       <label class="form-label" for="target_language">Language</label>
       <input class="form-control" id="target_language" name="target_language" value="<%= project?.target_language || 'English' %>">

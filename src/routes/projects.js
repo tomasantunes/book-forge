@@ -36,6 +36,7 @@ function payload(body, coverPath = null) {
     tone: String(body.tone || '').trim(),
     audience: String(body.audience || '').trim(),
     book_type: bookType,
+    web_search_enabled: body.web_search_enabled === '1' ? 1 : 0,
     cover_image_path: coverPath
   };
 }

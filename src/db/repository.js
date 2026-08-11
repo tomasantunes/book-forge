@@ -16,11 +16,11 @@ function createProject(data) {
   const stmt = db.prepare(`
     INSERT INTO projects (
       title, subtitle, author, description, guidance_prompt, target_language,
-      target_word_count, target_chapter_count, genre, tone, audience, book_type, cover_image_path,
+      target_word_count, target_chapter_count, genre, tone, audience, book_type, web_search_enabled, cover_image_path,
       created_at, updated_at
     ) VALUES (
       @title, @subtitle, @author, @description, @guidance_prompt, @target_language,
-      @target_word_count, @target_chapter_count, @genre, @tone, @audience, @book_type, @cover_image_path,
+      @target_word_count, @target_chapter_count, @genre, @tone, @audience, @book_type, @web_search_enabled, @cover_image_path,
       @created_at, @updated_at
     )
   `);
@@ -44,6 +44,7 @@ function updateProject(id, data) {
       tone = @tone,
       audience = @audience,
       book_type = @book_type,
+      web_search_enabled = @web_search_enabled,
       cover_image_path = COALESCE(@cover_image_path, cover_image_path),
       updated_at = @updated_at
     WHERE id = @id

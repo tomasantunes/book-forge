@@ -1,6 +1,6 @@
 # BookForge AI
 
-BookForge AI is a Node.js, Express, SQLite, Bootstrap 5 application for generating long-form fiction and non-fiction books from uploaded `.txt` and `.md` source files, a guidance prompt, and an optional cover image.
+BookForge AI is a Node.js, Express, SQLite, Bootstrap 5 application for generating long-form fiction and non-fiction books from uploaded text, Markdown, and image source files, a guidance prompt, and an optional cover image. Uploaded PNG, JPEG, WebP, and GIF images are analyzed by the AI and their visual context is incorporated into planning and chapter generation.
 
 ## Setup
 
@@ -12,7 +12,7 @@ npm install
 cp .env.example .env
 ```
 
-Edit `.env` and set `OPENAI_API_KEY`.
+Edit `.env` and set `OPENAI_API_KEY`. Web-enabled generation uses `gpt-5.5` by default; set `OPENAI_WEB_SEARCH_MODEL` to another web-search-capable model if needed.
 
 ```bash
 npm run dev
@@ -52,7 +52,9 @@ Non-fiction prompts do not request fictional continuity, characters, plot arcs, 
 ## Main Features
 
 - Project CRUD
-- Multiple source file uploads
+- Multiple text, Markdown, and image source uploads
+- Vision analysis of PNG, JPEG, WebP, and GIF source images
+- Optional web research during book planning and chapter generation
 - Optional cover upload
 - Separate OpenAI planning and chapter-generation paths for fiction and non-fiction
 - Sequential chapter generation and regeneration

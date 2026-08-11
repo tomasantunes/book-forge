@@ -94,6 +94,7 @@ function ensureDatabase() {
   `);
 
   addColumnIfMissing('projects', 'book_type', "TEXT NOT NULL DEFAULT 'fiction'");
+  addColumnIfMissing('projects', 'web_search_enabled', 'INTEGER NOT NULL DEFAULT 0');
   addColumnIfMissing('book_plans', 'central_thesis', 'TEXT');
   addColumnIfMissing('book_plans', 'target_reader', 'TEXT');
   addColumnIfMissing('book_plans', 'key_terms', 'TEXT');

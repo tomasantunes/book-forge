@@ -1,6 +1,9 @@
 const OpenAI = require('openai');
+const fs = require('fs');
+const path = require('path');
 
 const model = process.env.OPENAI_MODEL || 'gpt-4.1-mini';
+const webSearchModel = process.env.OPENAI_WEB_SEARCH_MODEL || 'gpt-5.5';
 
 function getClient() {
   if (!process.env.OPENAI_API_KEY) {
@@ -12,21 +15,35 @@ function getClient() {
 async function completeText(system, user, options = {}) {
   const client = getClient();
   const response = await client.responses.create({
-    model,
+    model: options.webSearch ? webSearchModel : model,
     temperature: options.temperature ?? 0.7,
     instructions: system,
-    input: user
+    input: user,
+    ...(options.webSearch ? { tools: [{ type: 'web_search' }] } : {})
   });
   return response.output_text?.trim() || '';
 }
 
-async function completeJson(system, user, fallback = {}) {
+const imageMimeTypes = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.gif': 'image/gif'
+};
+
+function getImageMimeType(filename) {
+  return imageMimeTypes[path.extname(filename).toLowerCase()] || null;
+}
+
+async function completeJson(system, user, fallback = {}, options = {}) {
   const client = getClient();
   const response = await client.responses.create({
-    model,
+    model: options.webSearch ? webSearchModel : model,
     temperature: 0.5,
     instructions: `${system}\nReturn only valid JSON with no markdown fences.`,
-    input: user
+    input: user,
+    ...(options.webSearch ? { tools: [{ type: 'web_search' }] } : {})
   });
   const content = response.output_text || '{}';
   try {
@@ -45,6 +62,28 @@ async function summarizeSourceFile(file, bookType = 'fiction') {
   const instruction = bookType === 'non_fiction'
     ? 'Analyze the source for non-fiction writing. Extract key ideas, claims, exact quotations present in the source, references, terminology, evidence, contradictions, and research gaps. Never create a quote or reference that is not in the source.'
     : 'Summarize this source for fiction planning. Preserve themes, named entities, chronology, setting, character details, and useful source facts.';
+  const mimeType = getImageMimeType(file.original_filename);
+  if (mimeType) {
+    const absolutePath = path.resolve(process.cwd(), file.file_path);
+    const imageData = fs.readFileSync(absolutePath).toString('base64');
+    return completeText(
+      'You analyze uploaded source material for use in long-form book generation.',
+      [{
+        role: 'user',
+        content: [
+          {
+            type: 'input_text',
+            text: `${instruction}\n\nAnalyze the uploaded image as source material. Describe visible people, objects, setting, actions, composition, mood, style, symbols, and legible text. Distinguish direct observations from interpretations. Filename: ${file.original_filename}`
+          },
+          {
+            type: 'input_image',
+            image_url: `data:${mimeType};base64,${imageData}`
+          }
+        ]
+      }]
+    );
+  }
+
   return completeText(
     'You summarize uploaded source material for use in long-form book generation.',
     `${instruction}\n\nFilename: ${file.original_filename}\n\nContent:\n${compact(file.extracted_text)}`
@@ -53,6 +92,16 @@ async function summarizeSourceFile(file, bookType = 'fiction') {
 
 function sourceSummaries(files, max = 5000) {
   return files.map((file) => `# ${file.original_filename}\n${file.summary || compact(file.extracted_text, max)}`).join('\n\n');
+}
+
+function webResearchInstruction(project) {
+  return Number(project.web_search_enabled)
+    ? '\nUse web search to find additional relevant, credible, and current information that can expand the book. Clearly distinguish uploaded material from web research, preserve useful source URLs, and never invent sources or quotations.'
+    : '';
+}
+
+function webSearchOptions(project) {
+  return { webSearch: Boolean(Number(project.web_search_enabled)) };
 }
 
 async function generateFictionBookPlan(project, files) {
@@ -75,8 +124,10 @@ Tone: ${project.tone || ''}
 Audience: ${project.audience || ''}
 
 Source summaries:
-${sources || 'No uploaded files. Use project metadata and guidance only.'}`,
-    {}
+${sources || 'No uploaded files. Use project metadata and guidance only.'}
+${webResearchInstruction(project)}`,
+    {},
+    webSearchOptions(project)
   );
 }
 
@@ -102,7 +153,8 @@ Tone: ${project.tone || ''}
 Audience: ${project.audience || ''}
 
 Uploaded source analysis:
-${sources || 'No uploaded sources. Explicitly record the resulting research and verification gaps.'}`,
+${sources || 'No uploaded sources. Explicitly record the resulting research and verification gaps.'}
+${webResearchInstruction(project)}`,
     {
       book_concept: '',
       central_thesis: '',
@@ -115,7 +167,8 @@ ${sources || 'No uploaded sources. Explicitly record the resulting research and 
       main_claims: [],
       research_gaps: [],
       fact_checking_notes: []
-    }
+    },
+    webSearchOptions(project)
   );
 }
 
@@ -136,8 +189,10 @@ Book concept: ${plan.concept}
 Detailed outline: ${plan.detailed_outline}
 Chapter list: ${plan.chapter_list}
 Book bible: ${plan.book_bible}
-Style guide: ${plan.style_guide}`,
-    { title: `Chapter ${chapterNumber}`, outline: '' }
+Style guide: ${plan.style_guide}
+${webResearchInstruction(project)}`,
+    { title: `Chapter ${chapterNumber}`, outline: '' },
+    webSearchOptions(project)
   );
 }
 
@@ -153,8 +208,10 @@ Table of contents: ${plan.chapter_list || ''}
 Chapter-by-chapter plan: ${plan.detailed_outline || ''}
 Source summary: ${plan.source_summary || ''}
 Known claims: ${plan.main_claims || ''}
-Research gaps: ${plan.research_gaps || ''}`,
-    { title: `Chapter ${chapterNumber}`, outline: '' }
+Research gaps: ${plan.research_gaps || ''}
+${webResearchInstruction(project)}`,
+    { title: `Chapter ${chapterNumber}`, outline: '' },
+    webSearchOptions(project)
   );
 }
 
@@ -205,7 +262,9 @@ ${previousChapter?.summary || 'This is the first chapter.'}
 
 ${rewriteInstruction}
 
-Write a complete chapter. Stay consistent with source material, plan, and continuity.`
+Write a complete chapter. Stay consistent with source material, plan, and continuity.
+${webResearchInstruction(project)}`,
+    webSearchOptions(project)
   );
 }
 
@@ -252,7 +311,9 @@ ${plan.fact_checking_notes || ''}
 
 ${rewriteInstruction}
 
-Use an introduction, main argument, supporting sections, examples, practical implications, and a short conclusion where appropriate. Only rely on supplied evidence. Mark claims that need support as [NEEDS VERIFICATION]. Do not fabricate a bibliography.`
+Use an introduction, main argument, supporting sections, examples, practical implications, and a short conclusion where appropriate. Rely on supplied evidence and, when web research is enabled, credible information found through web search. Mark claims that need support as [NEEDS VERIFICATION]. Do not fabricate a bibliography.
+${webResearchInstruction(project)}`,
+    webSearchOptions(project)
   );
 }
 
