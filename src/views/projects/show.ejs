@@ -21,7 +21,7 @@
       <div class="d-flex justify-content-between align-items-center mb-3">
         <div>
           <h2 class="h5 mb-1">Source materials</h2>
-          <p class="small text-secondary mb-0">Text, Markdown, PNG, JPEG, WebP, and GIF, up to <%= process.env.MAX_UPLOAD_MB || 10 %> MB each.</p>
+          <p class="small text-secondary mb-0">Text, Markdown, PNG, JPEG, WebP, and GIF, up to <%= process.env.MAX_UPLOAD_MB || 10 %> MB each and <%= process.env.MAX_SOURCE_FILES || 2000 %> files per upload.</p>
         </div>
         <span class="badge text-bg-light border"><%= files.length %> files</span>
       </div>
