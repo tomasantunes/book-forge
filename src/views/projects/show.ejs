@@ -53,10 +53,27 @@
           <h2 class="h5 mb-1">Book plan</h2>
           <p class="small text-secondary mb-0"><%= project.book_type === 'non_fiction' ? 'Thesis, source analysis, claims, research gaps, and fact-checking.' : 'Concept, outline, book bible, style, and continuity.' %></p>
         </div>
-        <form method="post" action="/projects/<%= project.id %>/generation/plan" data-loading-form>
-          <button class="btn btn-primary" type="submit"><%= plan ? 'Regenerate Book Plan' : 'Generate Book Plan' %></button>
+        <form method="post" action="/projects/<%= project.id %>/generation/plan">
+          <button class="btn btn-primary" type="submit" <%= planGenerationRunning ? 'disabled' : '' %>><%= planGenerationRunning ? 'Generating Book Plan...' : (plan ? 'Regenerate Book Plan' : 'Generate Book Plan') %></button>
         </form>
       </div>
+      <% const analyzedCount = files.filter((file) => file.summary && file.summary.trim()).length; %>
+      <% if (files.length) { %>
+        <div class="mb-3">
+          <div class="d-flex justify-content-between small text-secondary mb-1"><span>Source analysis</span><span><%= analyzedCount.toLocaleString() %>/<%= files.length.toLocaleString() %></span></div>
+          <div class="progress" role="progressbar" aria-label="Source analysis" aria-valuenow="<%= analyzedCount %>" aria-valuemin="0" aria-valuemax="<%= files.length %>">
+            <div class="progress-bar" style="width: <%= Math.round((analyzedCount / files.length) * 100) %>%"></div>
+          </div>
+        </div>
+      <% } %>
+      <% if (planGenerationRunning) { %>
+        <div class="alert alert-info py-2 small">Generation is running in the background. This page refreshes every 10 seconds; you can safely navigate away.</div>
+        <script>setTimeout(() => window.location.reload(), 10000);</script>
+      <% } %>
+      <% const latestPlanLog = logs.find((log) => log.step === 'book_plan'); %>
+      <% if (!planGenerationRunning && latestPlanLog?.status === 'failed') { %>
+        <div class="alert alert-danger py-2 small"><strong>Book plan generation stopped:</strong> <%= latestPlanLog.message %> Correct the problem and try again; completed file analyses have been saved.</div>
+      <% } %>
       <% if (plan) { %>
         <div class="accordion" id="planAccordion">
           <% const planSections = project.book_type === 'non_fiction' ? [

@@ -4,12 +4,23 @@ const path = require('path');
 
 const model = process.env.OPENAI_MODEL || 'gpt-4.1-mini';
 const webSearchModel = process.env.OPENAI_WEB_SEARCH_MODEL || 'gpt-5.5';
+const requestTimeoutMs = Math.max(10000, Number(process.env.OPENAI_REQUEST_TIMEOUT_MS || 120000));
 
 function getClient() {
   if (!process.env.OPENAI_API_KEY) {
     throw new Error('OPENAI_API_KEY is missing. Add it to .env before running AI generation.');
   }
-  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  return new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+    timeout: requestTimeoutMs,
+    maxRetries: Math.max(0, Number(process.env.OPENAI_MAX_RETRIES || 2))
+  });
+}
+
+function requireOutput(response, operation) {
+  const output = response.output_text?.trim();
+  if (!output) throw new Error(`${operation} returned an empty response. Please try again.`);
+  return output;
 }
 
 async function completeText(system, user, options = {}) {
@@ -21,7 +32,7 @@ async function completeText(system, user, options = {}) {
     input: user,
     ...(options.webSearch ? { tools: [{ type: 'web_search' }] } : {})
   });
-  return response.output_text?.trim() || '';
+  return requireOutput(response, 'AI generation');
 }
 
 const imageMimeTypes = {
@@ -45,7 +56,7 @@ async function completeJson(system, user, fallback = {}, options = {}) {
     input: user,
     ...(options.webSearch ? { tools: [{ type: 'web_search' }] } : {})
   });
-  const content = response.output_text || '{}';
+  const content = requireOutput(response, 'JSON generation');
   try {
     return JSON.parse(content);
   } catch (error) {
@@ -94,6 +105,17 @@ function sourceSummaries(files, max = 5000) {
   return files.map((file) => `# ${file.original_filename}\n${file.summary || compact(file.extracted_text, max)}`).join('\n\n');
 }
 
+async function consolidateSourceSummaries(sourceText, bookType = 'fiction') {
+  const instruction = bookType === 'non_fiction'
+    ? 'Preserve key ideas, claims, evidence, quotations explicitly present, terminology, contradictions, source names, research gaps, and verification needs. Never invent facts, quotations, or references.'
+    : 'Preserve themes, named entities, chronology, settings, character details, source names, contradictions, and facts useful for planning.';
+  return completeText(
+    'You consolidate source summaries into a compact, information-dense digest for planning a long-form book.',
+    `${instruction}\n\nConsolidate the following source summaries. Remove repetition while retaining meaningful distinctions between sources:\n\n${sourceText}`,
+    { temperature: 0.2 }
+  );
+}
+
 function webResearchInstruction(project) {
   return Number(project.web_search_enabled)
     ? '\nUse web search to find additional relevant, credible, and current information that can expand the book. Clearly distinguish uploaded material from web research, preserve useful source URLs, and never invent sources or quotations.'
@@ -104,8 +126,8 @@ function webSearchOptions(project) {
   return { webSearch: Boolean(Number(project.web_search_enabled)) };
 }
 
-async function generateFictionBookPlan(project, files) {
-  const sources = sourceSummaries(files);
+async function generateFictionBookPlan(project, files, preparedSources = '') {
+  const sources = preparedSources || sourceSummaries(files);
   return completeJson(
     'You are a senior book architect who creates detailed plans for complete books.',
     `Create a book plan as JSON with keys: concept, detailed_outline, chapter_list, book_bible, style_guide, character_location_notes, continuity_notes, source_summary.
@@ -131,8 +153,8 @@ ${webResearchInstruction(project)}`,
   );
 }
 
-async function generateNonFictionBookPlan(project, files) {
-  const sources = sourceSummaries(files);
+async function generateNonFictionBookPlan(project, files, preparedSources = '') {
+  const sources = preparedSources || sourceSummaries(files);
   return completeJson(
     'You are a non-fiction editor and research architect. Build evidence-aware books from supplied material. Never invent citations, references, quotations, or facts. Mark unsupported information as needing verification. Do not create characters, plot arcs, fictional continuity, or world-building.',
     `Create a non-fiction plan as JSON using exactly these keys:
@@ -172,10 +194,10 @@ ${webResearchInstruction(project)}`,
   );
 }
 
-async function generateBookPlan(project, files) {
+async function generateBookPlan(project, files, preparedSources = '') {
   return project.book_type === 'non_fiction'
-    ? generateNonFictionBookPlan(project, files)
-    : generateFictionBookPlan(project, files);
+    ? generateNonFictionBookPlan(project, files, preparedSources)
+    : generateFictionBookPlan(project, files, preparedSources);
 }
 
 async function generateFictionChapterOutline(project, plan, chapterNumber) {
@@ -384,6 +406,7 @@ ${chapter.summary || ''}`,
 
 module.exports = {
   summarizeSourceFile,
+  consolidateSourceSummaries,
   generateBookPlan,
   generateChapterOutline,
   generateChapter,

@@ -28,6 +28,7 @@ Open [http://localhost:3000](http://localhost:3000).
 - The app validates file types and upload size.
 - Source uploads allow up to 2,000 files per request by default. Set `MAX_SOURCE_FILES` to change the limit.
 - Book generation is incremental: file summaries, plan, chapter outlines, chapters, summaries, and continuity notes are saved as generation progresses.
+- Large source collections are summarized concurrently, consolidated in context-safe batches, and reduced before book planning. Plan generation runs in the background with progress logs, duplicate-job protection, request timeouts, and retries.
 - AI generation requires a valid OpenAI API key. Project CRUD, chapter editing, preview, and PDF export remain local.
 
 ## Fiction Workflow

@@ -1,6 +1,11 @@
 const repo = require('../db/repository');
 const ai = require('./openaiService');
 
+const activePlanJobs = new Set();
+const summaryConcurrency = Math.max(1, Math.min(10, Number(process.env.SUMMARY_CONCURRENCY || 4)));
+const batchCharacterLimit = Math.max(10000, Number(process.env.SUMMARY_BATCH_CHARACTERS || 60000));
+const finalSourceCharacterLimit = Math.max(20000, Number(process.env.PLAN_SOURCE_CHARACTERS || 120000));
+
 function requireProject(projectId) {
   const project = repo.getProject(projectId);
   if (!project) throw new Error('Project not found');
@@ -10,24 +15,100 @@ function requireProject(projectId) {
   return project;
 }
 
-async function generatePlan(projectId) {
-  const project = requireProject(projectId);
-  const files = repo.listProjectFiles(projectId);
-  repo.addLog(projectId, 'source_summaries', 'running', 'Summarizing uploaded files');
-
-  for (const file of files) {
-    if (!file.summary) {
-      const summary = await ai.summarizeSourceFile(file, project.book_type);
-      repo.updateFileSummary(file.id, summary);
+function splitByCharacterLimit(items, limit) {
+  const batches = [];
+  let batch = [];
+  let length = 0;
+  for (const item of items) {
+    if (batch.length && length + item.length > limit) {
+      batches.push(batch);
+      batch = [];
+      length = 0;
     }
+    batch.push(item);
+    length += item.length;
   }
+  if (batch.length) batches.push(batch);
+  return batches;
+}
 
-  const summarizedFiles = repo.listProjectFiles(projectId);
-  repo.addLog(projectId, 'book_plan', 'running', 'Generating book plan');
-  const plan = await ai.generateBookPlan(project, summarizedFiles);
-  const planId = repo.upsertBookPlan(projectId, plan);
-  repo.addLog(projectId, 'book_plan', 'success', 'Book plan generated');
-  return planId;
+async function summarizeMissingFiles(project, files) {
+  const pending = files.filter((file) => !file.summary?.trim());
+  if (!pending.length) return;
+
+  let nextIndex = 0;
+  let completed = 0;
+  const workers = Array.from({ length: Math.min(summaryConcurrency, pending.length) }, async () => {
+    while (nextIndex < pending.length) {
+      const file = pending[nextIndex];
+      nextIndex += 1;
+      try {
+        const summary = await ai.summarizeSourceFile(file, project.book_type);
+        repo.updateFileSummary(file.id, summary);
+        completed += 1;
+        if (completed === pending.length || completed % 25 === 0) {
+          repo.addLog(project.id, 'source_summaries', 'running', `Analyzed ${completed} of ${pending.length} pending files`);
+        }
+      } catch (error) {
+        throw new Error(`Could not analyze "${file.original_filename}": ${error.message}`);
+      }
+    }
+  });
+  const results = await Promise.allSettled(workers);
+  const failure = results.find((result) => result.status === 'rejected');
+  if (failure) throw failure.reason;
+}
+
+async function buildPlanningSourceContext(project, files) {
+  let entries = files.map((file) => `# ${file.original_filename}\n${file.summary.trim()}`);
+  let level = 1;
+  while (entries.join('\n\n').length > finalSourceCharacterLimit) {
+    const batches = splitByCharacterLimit(entries, batchCharacterLimit);
+    repo.addLog(project.id, 'source_consolidation', 'running', `Consolidating ${batches.length} source batches (level ${level})`);
+    const consolidated = [];
+    for (let index = 0; index < batches.length; index += 1) {
+      const digest = await ai.consolidateSourceSummaries(batches[index].join('\n\n'), project.book_type);
+      consolidated.push(`# Consolidated source batch ${index + 1}\n${digest}`);
+    }
+    if (consolidated.join('\n\n').length >= entries.join('\n\n').length) {
+      throw new Error('Source consolidation did not reduce the planning context enough. Reduce PLAN_SOURCE_CHARACTERS or upload smaller source files.');
+    }
+    entries = consolidated;
+    level += 1;
+  }
+  return entries.join('\n\n');
+}
+
+async function generatePlan(projectId) {
+  const jobKey = String(projectId);
+  if (activePlanJobs.has(jobKey)) throw new Error('A book plan is already being generated for this project.');
+  activePlanJobs.add(jobKey);
+  try {
+    const project = requireProject(projectId);
+    const files = repo.listProjectFiles(projectId);
+    repo.addLog(projectId, 'source_summaries', 'running', `Checking ${files.length} uploaded files`);
+    await summarizeMissingFiles(project, files);
+
+    const summarizedFiles = repo.listProjectFiles(projectId);
+    const stillMissing = summarizedFiles.filter((file) => !file.summary?.trim());
+    if (stillMissing.length) throw new Error(`${stillMissing.length} files could not be analyzed. The book plan was not generated.`);
+    const planningSources = await buildPlanningSourceContext(project, summarizedFiles);
+    repo.addLog(projectId, 'book_plan', 'running', 'Generating book plan');
+    const plan = await ai.generateBookPlan(project, summarizedFiles, planningSources);
+    if (plan.raw) throw new Error('The model returned an invalid book-plan format. Completed file analyses were saved; please try generating the plan again.');
+    const planId = repo.upsertBookPlan(projectId, plan);
+    repo.addLog(projectId, 'book_plan', 'success', 'Book plan generated');
+    return planId;
+  } catch (error) {
+    repo.addLog(projectId, 'book_plan', 'failed', error.message);
+    throw error;
+  } finally {
+    activePlanJobs.delete(jobKey);
+  }
+}
+
+function isPlanGenerationRunning(projectId) {
+  return activePlanJobs.has(String(projectId));
 }
 
 async function ensureChapterOutlines(project, plan) {
@@ -110,6 +191,7 @@ async function generateAllChapters(projectId) {
 
 module.exports = {
   generatePlan,
+  isPlanGenerationRunning,
   generateSingleChapter,
   generateAllChapters
 };

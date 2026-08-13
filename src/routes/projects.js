@@ -4,6 +4,7 @@ const express = require('express');
 const multer = require('multer');
 const sanitize = require('sanitize-filename');
 const repo = require('../db/repository');
+const generation = require('../services/generationService');
 
 const router = express.Router();
 const uploadDir = path.join(process.cwd(), 'uploads', 'covers');
@@ -65,7 +66,8 @@ router.get('/:id', (req, res) => {
     files: repo.listProjectFiles(project.id),
     plan: repo.getBookPlan(project.id),
     chapters: repo.listChapters(project.id),
-    logs: repo.listLogs(project.id)
+    logs: repo.listLogs(project.id),
+    planGenerationRunning: generation.isPlanGenerationRunning(project.id)
   });
 });
 
