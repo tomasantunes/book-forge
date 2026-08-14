@@ -1,6 +1,7 @@
 const express = require('express');
 const repo = require('../db/repository');
 const pdf = require('../services/pdfService');
+const epub = require('../services/epubService');
 
 const router = express.Router({ mergeParams: true });
 
@@ -30,6 +31,21 @@ router.post('/pdf', async (req, res, next) => {
     res.download(require('path').resolve(process.cwd(), outputPath));
   } catch (error) {
     repo.addLog(req.params.projectId, 'pdf_export', 'failed', error.message);
+    next(error);
+  }
+});
+
+router.post('/epub', (req, res, next) => {
+  try {
+    const project = repo.getProject(req.params.projectId);
+    if (!project) return res.status(404).send('Project not found');
+    const chapters = exportable(project.id);
+    if (!chapters.length) throw new Error('Generate at least one chapter before exporting.');
+    const outputPath = epub.exportEpub(project, chapters);
+    repo.addLog(project.id, 'epub_export', 'success', `EPUB exported to ${outputPath}`);
+    res.download(require('path').resolve(process.cwd(), outputPath));
+  } catch (error) {
+    repo.addLog(req.params.projectId, 'epub_export', 'failed', error.message);
     next(error);
   }
 });

@@ -145,6 +145,9 @@
         <form method="post" action="/projects/<%= project.id %>/export/pdf" data-loading-form>
           <button class="btn btn-success" type="submit" <%= generated ? '' : 'disabled' %>>Export PDF</button>
         </form>
+        <form method="post" action="/projects/<%= project.id %>/export/epub" data-loading-form>
+          <button class="btn btn-success" type="submit" <%= generated ? '' : 'disabled' %>>Export EPUB</button>
+        </form>
       </div>
     </section>
   </div>
@@ -165,6 +168,38 @@
         <dt class="col-5 text-secondary">Audience</dt><dd class="col-7"><%= project.audience || '—' %></dd>
         <dt class="col-5 text-secondary">Web research</dt><dd class="col-7"><%= Number(project.web_search_enabled) ? 'Enabled' : 'Disabled' %></dd>
       </dl>
+    </section>
+
+    <% const flaggedChapters = chapters.filter((chapter) => /\[(?:NEEDS?|REQUIRES?)\s+VERIFICATION\]|\[(?:NECESSITA|REQUER)\s+(?:DE\s+)?VERIFICA(?:Ç|C)[AÃ]O\]/i.test(chapter.content || '')); %>
+    <% const editorialNotes = [
+      plan?.research_gaps ? ['Research gaps', plan.research_gaps] : null,
+      plan?.fact_checking_notes ? ['Fact-checking notes', plan.fact_checking_notes] : null,
+      ...chapters.filter((chapter) => chapter.references_needed).map((chapter) => [`Chapter ${chapter.chapter_number}: references needed`, chapter.references_needed]),
+      ...chapters.filter((chapter) => chapter.factual_uncertainty_notes).map((chapter) => [`Chapter ${chapter.chapter_number}: factual uncertainty`, chapter.factual_uncertainty_notes])
+    ].filter(Boolean); %>
+    <section class="bg-white border <%= editorialNotes.length || flaggedChapters.length ? 'border-warning' : '' %> rounded p-4 mb-4">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="h6 mb-0">Editorial and verification notes</h2>
+        <span class="badge <%= editorialNotes.length || flaggedChapters.length ? 'text-bg-warning' : 'text-bg-success' %>"><%= editorialNotes.length + flaggedChapters.length || 'None' %></span>
+      </div>
+      <p class="small text-secondary">Internal documentation and fact-checking notes are kept here and excluded from reader-facing previews and PDFs.</p>
+      <% if (flaggedChapters.length) { %>
+        <div class="alert alert-warning py-2 small">
+          Verification markers were removed from the exported reader copy. Review the underlying claims in chapter<%= flaggedChapters.length === 1 ? '' : 's' %> <%= flaggedChapters.map((chapter) => chapter.chapter_number).join(', ') %>.
+        </div>
+      <% } %>
+      <% if (!editorialNotes.length && !flaggedChapters.length) { %>
+        <p class="small text-secondary mb-0">No editorial or verification notes have been recorded.</p>
+      <% } else if (editorialNotes.length) { %>
+        <div class="vstack gap-2">
+          <% editorialNotes.forEach(([label, value]) => { %>
+            <details class="border rounded p-2">
+              <summary class="small fw-medium"><%= label %></summary>
+              <div class="small text-break mt-2" style="white-space: pre-wrap"><%= value %></div>
+            </details>
+          <% }) %>
+        </div>
+      <% } %>
     </section>
 
     <% const requestErrors = logs.filter((log) => ['connectivity_error', 'openai_api_error'].includes(log.step)); %>
