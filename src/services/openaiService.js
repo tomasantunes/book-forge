@@ -6,9 +6,41 @@ const model = process.env.OPENAI_MODEL || 'gpt-4.1-mini';
 const webSearchModel = process.env.OPENAI_WEB_SEARCH_MODEL || 'gpt-5.5';
 const requestTimeoutMs = Math.max(10000, Number(process.env.OPENAI_REQUEST_TIMEOUT_MS || 120000));
 
+const connectivityCodes = new Set([
+  'ECONNABORTED', 'ECONNREFUSED', 'ECONNRESET', 'ENETDOWN', 'ENETUNREACH',
+  'ENOTFOUND', 'ETIMEDOUT', 'UND_ERR_CONNECT_TIMEOUT', 'UND_ERR_SOCKET'
+]);
+
+function normalizeOpenAIError(error) {
+  if (error?.generationErrorType) return error;
+  const code = error?.code || error?.cause?.code || '';
+  const status = error?.status || error?.statusCode;
+  const isConnectivityError = connectivityCodes.has(code)
+    || /connection|network|fetch failed|socket|timed?\s*out/i.test(error?.message || '');
+  const message = isConnectivityError
+    ? `Internet connection error while contacting OpenAI${code ? ` (${code})` : ''}: ${error?.message || 'request failed'}`
+    : `OpenAI API request failed${status ? ` (HTTP ${status})` : ''}${code ? ` (${code})` : ''}: ${error?.message || 'unknown error'}`;
+  const wrapped = new Error(message);
+  wrapped.generationErrorType = isConnectivityError ? 'connectivity' : 'openai_api';
+  wrapped.status = status;
+  wrapped.code = code;
+  wrapped.cause = error;
+  return wrapped;
+}
+
+async function requestOpenAI(createRequest) {
+  try {
+    return await createRequest();
+  } catch (error) {
+    throw normalizeOpenAIError(error);
+  }
+}
+
 function getClient() {
   if (!process.env.OPENAI_API_KEY) {
-    throw new Error('OPENAI_API_KEY is missing. Add it to .env before running AI generation.');
+    const error = new Error('OPENAI_API_KEY is missing. Add it to .env before running AI generation.');
+    error.generationErrorType = 'openai_api';
+    throw error;
   }
   return new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
@@ -19,19 +51,23 @@ function getClient() {
 
 function requireOutput(response, operation) {
   const output = response.output_text?.trim();
-  if (!output) throw new Error(`${operation} returned an empty response. Please try again.`);
+  if (!output) {
+    const error = new Error(`${operation} returned an empty response. Please try again.`);
+    error.generationErrorType = 'openai_api';
+    throw error;
+  }
   return output;
 }
 
 async function completeText(system, user, options = {}) {
   const client = getClient();
-  const response = await client.responses.create({
+  const response = await requestOpenAI(() => client.responses.create({
     model: options.webSearch ? webSearchModel : model,
     temperature: options.temperature ?? 0.7,
     instructions: system,
     input: user,
     ...(options.webSearch ? { tools: [{ type: 'web_search' }] } : {})
-  });
+  }));
   return requireOutput(response, 'AI generation');
 }
 
@@ -49,13 +85,13 @@ function getImageMimeType(filename) {
 
 async function completeJson(system, user, fallback = {}, options = {}) {
   const client = getClient();
-  const response = await client.responses.create({
+  const response = await requestOpenAI(() => client.responses.create({
     model: options.webSearch ? webSearchModel : model,
     temperature: 0.5,
     instructions: `${system}\nReturn only valid JSON with no markdown fences.`,
     input: user,
     ...(options.webSearch ? { tools: [{ type: 'web_search' }] } : {})
-  });
+  }));
   const content = requireOutput(response, 'JSON generation');
   try {
     return JSON.parse(content);

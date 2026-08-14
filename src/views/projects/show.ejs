@@ -71,6 +71,17 @@
         <script>setTimeout(() => window.location.reload(), 10000);</script>
       <% } %>
       <% const latestPlanLog = logs.find((log) => log.step === 'book_plan'); %>
+      <% const currentProgressLog = logs.find((log) => ['source_summaries', 'source_consolidation', 'book_plan'].includes(log.step)); %>
+      <% if (currentProgressLog) { %>
+        <div class="border rounded p-3 mb-3" aria-live="polite">
+          <div class="d-flex justify-content-between align-items-center gap-2 mb-1">
+            <strong class="small">Current progress</strong>
+            <span class="badge <%= currentProgressLog.status === 'success' ? 'text-bg-success' : currentProgressLog.status === 'failed' ? 'text-bg-danger' : 'text-bg-warning' %>"><%= currentProgressLog.status %></span>
+          </div>
+          <div><%= currentProgressLog.message %></div>
+          <div class="small text-secondary mt-1"><%= new Date(currentProgressLog.created_at).toLocaleString() %></div>
+        </div>
+      <% } %>
       <% if (!planGenerationRunning && latestPlanLog?.status === 'failed') { %>
         <div class="alert alert-danger py-2 small"><strong>Book plan generation stopped:</strong> <%= latestPlanLog.message %> Correct the problem and try again; completed file analyses have been saved.</div>
       <% } %>
@@ -156,6 +167,27 @@
       </dl>
     </section>
 
+    <% const requestErrors = logs.filter((log) => ['connectivity_error', 'openai_api_error'].includes(log.step)); %>
+    <section class="bg-white border <%= requestErrors.length ? 'border-danger' : '' %> rounded p-4 mb-4">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="h6 mb-0">Connection and API errors</h2>
+        <span class="badge <%= requestErrors.length ? 'text-bg-danger' : 'text-bg-success' %>"><%= requestErrors.length ? requestErrors.length : 'None' %></span>
+      </div>
+      <% if (!requestErrors.length) { %>
+        <p class="small text-secondary mb-0">No internet connectivity or OpenAI API errors have been recorded.</p>
+      <% } else { %>
+        <div class="vstack gap-3">
+          <% requestErrors.slice(0, 8).forEach((log) => { %>
+            <div class="small">
+              <div class="fw-medium text-danger"><%= log.step === 'connectivity_error' ? 'Internet connectivity' : 'OpenAI API' %></div>
+              <div><%= log.message %></div>
+              <div class="text-secondary"><%= new Date(log.created_at).toLocaleString() %></div>
+            </div>
+          <% }) %>
+        </div>
+      <% } %>
+    </section>
+
     <section class="bg-white border rounded p-4">
       <h2 class="h6 mb-3">Generation log</h2>
       <% if (!logs.length) { %>
@@ -169,6 +201,7 @@
                 <span class="badge status-pill <%= log.status === 'success' ? 'text-bg-success' : log.status === 'failed' ? 'text-bg-danger' : 'text-bg-warning' %>"><%= log.status %></span>
               </div>
               <div class="small text-secondary"><%= log.message %></div>
+              <div class="small text-secondary"><%= new Date(log.created_at).toLocaleString() %></div>
             </div>
           <% }) %>
         </div>
