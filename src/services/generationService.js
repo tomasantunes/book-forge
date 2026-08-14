@@ -12,6 +12,12 @@ function reportPlanProgress(projectId, step, status, message) {
   console[method](`[Book plan][project ${projectId}][${step}][${status}] ${message}`);
 }
 
+function reportChapterProgress(projectId, step, status, message, chapterId = null) {
+  repo.addLog(projectId, step, status, message, chapterId);
+  const method = status === 'failed' ? 'error' : 'log';
+  console[method](`[Chapters][project ${projectId}][${step}][${status}] ${message}`);
+}
+
 function requireProject(projectId) {
   const project = repo.getProject(projectId);
   if (!project) throw new Error('Project not found');
@@ -141,7 +147,7 @@ async function ensureChapterOutlines(project, plan) {
   for (let chapterNumber = 1; chapterNumber <= target; chapterNumber += 1) {
     const existing = repo.getChapterByNumber(project.id, chapterNumber);
     if (!existing || !existing.outline) {
-      repo.addLog(project.id, 'chapter_outline', 'running', `Generating outline for chapter ${chapterNumber}`);
+      reportChapterProgress(project.id, 'chapter_outline', 'running', `Generating outline for chapter ${chapterNumber} of ${target}`);
       const outline = await ai.generateChapterOutline(project, plan, chapterNumber);
       repo.upsertChapter(project.id, {
         chapter_number: chapterNumber,
@@ -151,6 +157,7 @@ async function ensureChapterOutlines(project, plan) {
         summary: existing?.summary || '',
         status: existing?.status || 'planned'
       });
+      reportChapterProgress(project.id, 'chapter_outline', 'success', `Outline generated for chapter ${chapterNumber} of ${target}`);
     }
   }
 }
@@ -168,27 +175,47 @@ async function generateSingleChapter(projectId, chapterNumber, force = false, re
   const files = repo.listProjectFiles(projectId);
   const chapter = repo.getChapterByNumber(projectId, chapterNumber);
   if (!chapter) throw new Error(`Chapter ${chapterNumber} does not exist`);
-  if (chapter.content && !force) return chapter.id;
+  const hasSummary = Boolean(chapter.summary?.trim());
+  const hasNonFictionReview = project.book_type !== 'non_fiction'
+    || Boolean(chapter.claims_list?.trim() || chapter.references_needed?.trim() || chapter.factual_uncertainty_notes?.trim());
+  if (chapter.content && hasSummary && hasNonFictionReview && !force) {
+    reportChapterProgress(projectId, 'chapter_generation', 'success', `Skipping chapter ${chapterNumber}; saved content already exists`, chapter.id);
+    return chapter.id;
+  }
 
-  const previousChapter = repo.getPreviousChapter(projectId, chapterNumber);
-  repo.addLog(projectId, 'chapter_generation', 'running', `Generating chapter ${chapterNumber}`, chapter.id);
-  const content = await ai.generateChapter(project, plan, files, chapter, previousChapter, rewritePrompt);
-  repo.upsertChapter(projectId, { ...chapter, content, status: 'generated' });
-
-  const savedChapter = repo.getChapterByNumber(projectId, chapterNumber);
-  repo.addLog(projectId, 'chapter_summary', 'running', `Summarizing chapter ${chapterNumber}`, savedChapter.id);
-  const summary = await ai.summarizeChapter(savedChapter, project);
-  repo.upsertChapter(projectId, { ...savedChapter, summary, status: 'generated' });
-
-  const finalChapter = repo.getChapterByNumber(projectId, chapterNumber);
-  if (project.book_type === 'non_fiction') {
-    const audit = await ai.analyzeNonFictionChapter(project, repo.getBookPlan(projectId), finalChapter);
-    repo.upsertChapter(projectId, { ...finalChapter, ...audit, status: 'generated' });
+  if (chapter.content && !force) {
+    reportChapterProgress(projectId, 'chapter_generation', 'running', `Resuming post-processing for chapter ${chapterNumber}; saved content will not be rewritten`, chapter.id);
   } else {
+    const previousChapter = repo.getPreviousChapter(projectId, chapterNumber);
+    reportChapterProgress(projectId, 'chapter_generation', 'running', `Writing chapter ${chapterNumber} of ${project.target_chapter_count}`, chapter.id);
+    const content = await ai.generateChapter(project, plan, files, chapter, previousChapter, rewritePrompt);
+    repo.upsertChapter(projectId, { ...chapter, content, status: 'generated' });
+  }
+
+  let savedChapter = repo.getChapterByNumber(projectId, chapterNumber);
+  if (!savedChapter.summary?.trim() || force) {
+    reportChapterProgress(projectId, 'chapter_summary', 'running', `Summarizing chapter ${chapterNumber} of ${project.target_chapter_count}`, savedChapter.id);
+    const summary = await ai.summarizeChapter(savedChapter, project);
+    repo.upsertChapter(projectId, { ...savedChapter, summary, status: 'generated' });
+    reportChapterProgress(projectId, 'chapter_summary', 'success', `Summary completed for chapter ${chapterNumber}`, savedChapter.id);
+    savedChapter = repo.getChapterByNumber(projectId, chapterNumber);
+  }
+
+  const finalChapter = savedChapter;
+  if (project.book_type === 'non_fiction') {
+    if (!hasNonFictionReview || force || !chapter.content) {
+      reportChapterProgress(projectId, 'chapter_review', 'running', `Reviewing claims and factual uncertainty for chapter ${chapterNumber}`, finalChapter.id);
+      const audit = await ai.analyzeNonFictionChapter(project, repo.getBookPlan(projectId), finalChapter);
+      repo.upsertChapter(projectId, { ...finalChapter, ...audit, status: 'generated' });
+      reportChapterProgress(projectId, 'chapter_review', 'success', `Review completed for chapter ${chapterNumber}`, finalChapter.id);
+    }
+  } else {
+    reportChapterProgress(projectId, 'chapter_continuity', 'running', `Updating continuity after chapter ${chapterNumber}`, finalChapter.id);
     const continuity = await ai.updateContinuity(project, repo.getBookPlan(projectId), finalChapter);
     repo.updateContinuity(projectId, continuity.continuity_notes || '', continuity.book_bible || null);
+    reportChapterProgress(projectId, 'chapter_continuity', 'success', `Continuity updated after chapter ${chapterNumber}`, finalChapter.id);
   }
-  repo.addLog(projectId, 'chapter_generation', 'success', `Chapter ${chapterNumber} generated`, savedChapter.id);
+  reportChapterProgress(projectId, 'chapter_generation', 'success', `Chapter ${chapterNumber} of ${project.target_chapter_count} generated`, savedChapter.id);
   return savedChapter.id;
 }
 
@@ -202,16 +229,24 @@ async function generateAllChapters(projectId) {
   await ensureChapterOutlines(project, plan);
 
   const total = Number(project.target_chapter_count || 1);
+  const existingCount = repo.listChapters(projectId).filter((chapter) => chapter.content?.trim()).length;
+  reportChapterProgress(
+    projectId,
+    'chapter_generation',
+    'running',
+    `Starting chapter generation: ${existingCount} of ${total} already completed; ${Math.max(0, total - existingCount)} remaining`
+  );
   for (let chapterNumber = 1; chapterNumber <= total; chapterNumber += 1) {
     await generateSingleChapter(projectId, chapterNumber, false);
   }
 
   if (project.book_type === 'non_fiction') {
-    repo.addLog(projectId, 'fact_check_review', 'running', 'Reviewing consistency and factual uncertainty');
+    reportChapterProgress(projectId, 'fact_check_review', 'running', 'Reviewing full-book consistency and factual uncertainty');
     const review = await ai.reviewNonFictionBook(project, repo.getBookPlan(projectId), repo.listChapters(projectId));
     repo.updateNonFictionReview(projectId, review);
-    repo.addLog(projectId, 'fact_check_review', 'success', 'Consistency and fact-checking review completed');
+    reportChapterProgress(projectId, 'fact_check_review', 'success', 'Consistency and fact-checking review completed');
   }
+  reportChapterProgress(projectId, 'chapter_generation', 'success', `All ${total} chapters are complete`);
 }
 
 module.exports = {

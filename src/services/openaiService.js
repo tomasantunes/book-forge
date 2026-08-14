@@ -2,9 +2,14 @@ const OpenAI = require('openai');
 const fs = require('fs');
 const path = require('path');
 
-const model = process.env.OPENAI_MODEL || 'gpt-4.1-mini';
+const model = process.env.OPENAI_MODEL || 'gpt-5.6-luna';
 const webSearchModel = process.env.OPENAI_WEB_SEARCH_MODEL || 'gpt-5.5';
 const requestTimeoutMs = Math.max(10000, Number(process.env.OPENAI_REQUEST_TIMEOUT_MS || 120000));
+const chapterSourceCharacterLimit = Math.max(20000, Number(process.env.CHAPTER_SOURCE_CHARACTERS || 120000));
+
+function samplingOptions(selectedModel, temperature) {
+  return /^gpt-5(?:[.\-]|$)/i.test(selectedModel) ? {} : { temperature };
+}
 
 const connectivityCodes = new Set([
   'ECONNABORTED', 'ECONNREFUSED', 'ECONNRESET', 'ENETDOWN', 'ENETUNREACH',
@@ -61,9 +66,10 @@ function requireOutput(response, operation) {
 
 async function completeText(system, user, options = {}) {
   const client = getClient();
+  const selectedModel = options.webSearch ? webSearchModel : model;
   const response = await requestOpenAI(() => client.responses.create({
-    model: options.webSearch ? webSearchModel : model,
-    temperature: options.temperature ?? 0.7,
+    model: selectedModel,
+    ...samplingOptions(selectedModel, options.temperature ?? 0.7),
     instructions: system,
     input: user,
     ...(options.webSearch ? { tools: [{ type: 'web_search' }] } : {})
@@ -85,9 +91,10 @@ function getImageMimeType(filename) {
 
 async function completeJson(system, user, fallback = {}, options = {}) {
   const client = getClient();
+  const selectedModel = options.webSearch ? webSearchModel : model;
   const response = await requestOpenAI(() => client.responses.create({
-    model: options.webSearch ? webSearchModel : model,
-    temperature: 0.5,
+    model: selectedModel,
+    ...samplingOptions(selectedModel, 0.5),
     instructions: `${system}\nReturn only valid JSON with no markdown fences.`,
     input: user,
     ...(options.webSearch ? { tools: [{ type: 'web_search' }] } : {})
@@ -139,6 +146,29 @@ async function summarizeSourceFile(file, bookType = 'fiction') {
 
 function sourceSummaries(files, max = 5000) {
   return files.map((file) => `# ${file.original_filename}\n${file.summary || compact(file.extracted_text, max)}`).join('\n\n');
+}
+
+function sourceSummariesWithinLimit(files, limit = chapterSourceCharacterLimit) {
+  const entries = [];
+  let remaining = limit;
+  for (const file of files) {
+    const heading = `# ${file.original_filename}\n`;
+    const content = file.summary || file.extracted_text || '';
+    const separatorLength = entries.length ? 2 : 0;
+    const available = remaining - heading.length - separatorLength;
+    if (available <= 0) break;
+    entries.push(`${heading}${content.slice(0, available)}`);
+    remaining -= heading.length + Math.min(content.length, available) + separatorLength;
+    if (remaining <= 0) break;
+  }
+  return entries.join('\n\n');
+}
+
+function chapterSourceContext(plan, files) {
+  const consolidated = plan.source_summary?.trim();
+  return consolidated
+    ? compact(consolidated, chapterSourceCharacterLimit)
+    : sourceSummariesWithinLimit(files, chapterSourceCharacterLimit);
 }
 
 async function consolidateSourceSummaries(sourceText, bookType = 'fiction') {
@@ -280,7 +310,7 @@ async function generateChapterOutline(project, plan, chapterNumber) {
 }
 
 async function generateFictionChapter(project, plan, files, chapter, previousChapter, rewritePrompt = '') {
-  const sourceContext = sourceSummaries(files, 2500);
+  const sourceContext = chapterSourceContext(plan, files);
   const rewriteInstruction = rewritePrompt
     ? `\nRewrite direction from the user:\n${rewritePrompt}\n\nFollow this direction while staying consistent with the project, source material, chapter position, and established continuity.`
     : '';
@@ -343,7 +373,7 @@ Target audience: ${project.audience || plan.target_reader || ''}
 Tone: ${project.tone || plan.style_guide || ''}
 
 Uploaded source summaries:
-${sourceSummaries(files, 3500) || 'No verified source material is available.'}
+${chapterSourceContext(plan, files) || 'No verified source material is available.'}
 
 Central thesis:
 ${plan.central_thesis || ''}

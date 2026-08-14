@@ -1,5 +1,6 @@
 const express = require('express');
 const generation = require('../services/generationService');
+const repo = require('../db/repository');
 
 const router = express.Router({ mergeParams: true });
 
@@ -17,6 +18,7 @@ router.post('/chapters', async (req, res, next) => {
     res.redirect(`/projects/${req.params.projectId}/chapters?success=${encodeURIComponent('Chapters generated')}`);
   } catch (error) {
     repo.addLog(req.params.projectId, 'chapter_generation', 'failed', error.message);
+    console.error(`[Chapters][project ${req.params.projectId}][chapter_generation][failed] ${error.message}`);
     next(error);
   }
 });
